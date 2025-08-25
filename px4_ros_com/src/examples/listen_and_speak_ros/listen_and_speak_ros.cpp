@@ -37,6 +37,37 @@ auto end  =std::chrono::high_resolution_clock::now();
 auto start=std::chrono::high_resolution_clock::now();
 
 
+// ===== 2nd-order Butterworth LPF (DF2T) =====
+struct Biquad {
+    float b0{0.f}, b1{0.f}, b2{0.f}, a1{0.f}, a2{0.f};
+    float s1{0.f}, s2{0.f};
+
+    inline void setButter2Lowpass(float fc_Hz, float fs_Hz) {
+        // bilinear transform, pre-warp
+        const float PI_F = 3.14159265358979323846f;
+        const float K = tanf(PI_F * fc_Hz / fs_Hz);   // pre-warped
+        const float KK = K * K;
+        const float denom_inv = 1.f / (1.f + 1.41421356f * K + KK); // sqrt(2)=1.4142..
+
+        b0 = KK * denom_inv;
+        b1 = 2.f * b0;
+        b2 = b0;
+        a1 = 2.f * (KK - 1.f) * denom_inv;
+        a2 = (1.f - 1.41421356f * K + KK) * denom_inv;
+
+        // reset states
+        s1 = 0.f; s2 = 0.f;
+    }
+
+    inline float step(float x) {
+        // Direct Form II Transposed
+        const float y = b0 * x + s1;
+        s1 = b1 * x - a1 * y + s2;
+        s2 = b2 * x - a2 * y;
+        return y;
+    }
+};
+
 
 class ListenAndSpeakRos : public rclcpp::Node
 {
@@ -122,10 +153,10 @@ public:
                 [this](const px4_msgs::msg::ActuatorMotors::UniquePtr msg) {
                         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
                         
-                        //f1 = msg->control[0];
-                        //f2 = msg->control[1];
-                        //f3 = msg->control[2];
-                        //f4 = msg->control[3];
+                        pwm1 = msg->control[0];
+                        pwm2 = msg->control[1];
+                        pwm3 = msg->control[2];
+                        pwm4 = msg->control[3];
                         
 
                 });
@@ -444,9 +475,16 @@ public:
         }
 
 private:
+
+	// --- Servo command LPF (for th1..th4) ---
+	Biquad lpf_th_[4];
+	bool   lpf_inited_{false};
+	rclcpp::Time lpf_prev_time_;  // dt 계산용 (초기 0)
+
 	float fx = 0.0f, fy = 0.0f, fz = 0.0f, tx = 0.0f, ty = 0.0f, tz = 0.0f, tz_trim = 0.0f;
 	float tx_dhat = 0.f, ty_dhat = 0.f, tz_dhat = 0.f;
 	float f1 = 0.0f, f2 = 0.0f, f3 = 0.0f, f4 = 0.0f;
+	float pwm1 = 0.0f, pwm2 = 0.0f, pwm3 = 0.0f, pwm4 = 0.0f;
 	float th1_cmd = 0.0f, th2_cmd = 0.0f, th3_cmd = 0.0f, th4_cmd = 0.0f, th5_cmd;
 	float th1_act = 0.0f, th2_act = 0.0f, th3_act = 0.0f, th4_act = 0.0f, th5_act;
 
