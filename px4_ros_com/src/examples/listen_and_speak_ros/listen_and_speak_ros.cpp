@@ -332,21 +332,62 @@ public:
 	                th3_cmd = asin(asine_safety(sine_theta_command(2)));
 	                th4_cmd = asin(asine_safety(sine_theta_command(3)));
 			}
-			if(th1_cmd < 0.001 && th1_cmd > -0.001){th1_cmd = 0.0;}
-			if(th2_cmd < 0.001 && th2_cmd > -0.001){th2_cmd = 0.0;}
-			if(th3_cmd < 0.001 && th3_cmd > -0.001){th3_cmd = 0.0;}
-			if(th4_cmd < 0.001 && th4_cmd > -0.001){th4_cmd = 0.0;}
 
+
+			// ----- (여기까지 th1_cmd..th4_cmd 계산 완료) -----
+
+			// === LPF init/update (once) ===
+			const float fc = 8.f; // [Hz] <- 요구사항
+			rclcpp::Time now = this->get_clock()->now();
+
+			if (!lpf_inited_) {
+				if (lpf_prev_time_.nanoseconds() != 0) {
+					const double dt = (now - lpf_prev_time_).seconds();
+					if (dt > 0.0) {
+						const float fs = static_cast<float>(1.0 / dt); // [Hz]
+						for (int i = 0; i < 4; ++i) {
+							lpf_th_[i].setButter2Lowpass(fc, fs);
+						}
+						lpf_inited_ = true;
+					}
+				}
+				lpf_prev_time_ = now; // 다음 루프에서 dt 계산
+			}
+
+			// === Apply LPF (if initialized) ===
+			float th1_cmd_f = lpf_inited_ ? lpf_th_[0].step(th1_cmd) : th1_cmd;
+			float th2_cmd_f = lpf_inited_ ? lpf_th_[1].step(th2_cmd) : th2_cmd;
+			float th3_cmd_f = lpf_inited_ ? lpf_th_[2].step(th3_cmd) : th3_cmd;
+			float th4_cmd_f = lpf_inited_ ? lpf_th_[3].step(th4_cmd) : th4_cmd;
+
+			// (선택) 아주 작은 데드존 유지
+			auto deadzone = [](float x){ return (x > -0.001f && x < 0.001f) ? 0.f : x; };
+			th1_cmd_f = deadzone(th1_cmd_f);
+			th2_cmd_f = deadzone(th2_cmd_f);
+			th3_cmd_f = deadzone(th3_cmd_f);
+			th4_cmd_f = deadzone(th4_cmd_f);
+
+			// (데드존 적용 뒤에 추가)
+			auto clamp = [](float v, float mn, float mx){ return v < mn ? mn : (v > mx ? mx : v); };
+
+			// sin 제한(±0.3)에 대응하는 각도 한계
+			const float kServoMaxRad = asinf(0.3f);  // ≈ 0.304693f
+
+			th1_cmd_f = clamp(th1_cmd_f, -kServoMaxRad, kServoMaxRad);
+			th2_cmd_f = clamp(th2_cmd_f, -kServoMaxRad, kServoMaxRad);
+			th3_cmd_f = clamp(th3_cmd_f, -kServoMaxRad, kServoMaxRad);
+			th4_cmd_f = clamp(th4_cmd_f, -kServoMaxRad, kServoMaxRad);
+
+			// === Publish filtered commands ===
 			std_msgs::msg::Float32MultiArray servo_angle_command;
-		        servo_angle_command.data.resize(5);
-        		servo_angle_command.data[0] = th1_cmd;
-		        servo_angle_command.data[1] = th2_cmd;
-		        servo_angle_command.data[2] = th3_cmd;
-		        servo_angle_command.data[3] = th4_cmd;
+			servo_angle_command.data.resize(5);
+			servo_angle_command.data[0] = th1_cmd_f;
+			servo_angle_command.data[1] = th2_cmd_f;
+			servo_angle_command.data[2] = th3_cmd_f;
+			servo_angle_command.data[3] = th4_cmd_f;
 			servo_angle_command.data[4] = tray_angle_command;
+			this->servo_angle_cmd_pub->publish(servo_angle_command);
 
-			// 퍼블리시
-                        this->servo_angle_cmd_pub->publish(servo_angle_command);
 
 			// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 			
