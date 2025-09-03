@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "dynamixel_workbench_msgs__py",
+		"source" : "/home/palletrone/ros2_ws/src/build/dynamixel_workbench_msgs/dynamixel_workbench_msgs__py"
+	}
+}

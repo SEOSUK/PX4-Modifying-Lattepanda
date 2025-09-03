@@ -88,7 +88,7 @@ private:
   {
     // ====== 조절 변수 ======
     double frequency = 0.05;  // [Hz] 8자 주기
-    double Amplitude = 0.5;   // [m] 8자 크기(긴 축)
+    double Amplitude = 0.4;   // [m] 8자 크기(긴 축)
     double angle_deg = 0;  // [deg] XY 평면에서 반시계 회전 각도
     double z_amp     = 0.1;   // [m] z 진폭
     double yaw_fixed = 0.0;   // [rad] 고정 yaw

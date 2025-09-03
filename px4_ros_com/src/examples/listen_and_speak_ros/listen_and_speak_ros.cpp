@@ -26,7 +26,7 @@
 
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
-
+#include <px4_msgs/msg/vehicle_rates_setpoint.hpp>
 
 using namespace std::chrono_literals;
 
@@ -84,9 +84,22 @@ public:
                 auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 6), qos_profile);
 
 
+		servo_lpf_fc_hz_ = this->declare_parameter<double>("servo_lpf_fc_hz", 8.0);
+		servo_lpf_fs_hz_ = this->declare_parameter<double>("servo_lpf_fs_hz", 100.0);
+
+
+		// 초기화
+		for (int i = 0; i < 4; ++i) {
+			lpf_th_[i].setButter2Lowpass(
+				static_cast<float>(servo_lpf_fc_hz_),
+				static_cast<float>(servo_lpf_fs_hz_));
+		}
+		lpf_inited_ = true;		
+
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
                 // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡPUBLISHERㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
                 // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
+
 
 		custom_control_mode_pub = this->create_publisher<px4_msgs::msg::CustomControlMode>("/fmu/in/custom_control_mode", 1);
 
@@ -104,17 +117,15 @@ public:
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡSUBSCRIBERㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 
-                torque_command_sub = this->create_subscription<px4_msgs::msg::VehicleTorqueSetpoint>("/fmu/out/vehicle_torque_setpoint", qos,
-                [this](const px4_msgs::msg::VehicleTorqueSetpoint::UniquePtr msg) {
-			
-			// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
-			tx = msg->xyz[0];
-			ty = msg->xyz[1];
-    			tz = msg->xyz[2];
-			tz_trim = msg->yaw_trim;
-
-
-                });
+		torque_command_sub = this->create_subscription<px4_msgs::msg::VehicleTorqueSetpoint>("/fmu/out/vehicle_torque_setpoint", qos,
+		[this](const px4_msgs::msg::VehicleTorqueSetpoint::UniquePtr msg) {
+	
+	// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
+		tx = msg->xyz[0];
+		ty = msg->xyz[1];
+			tz = msg->xyz[2];
+		tz_trim = msg->yaw_trim;
+		});
 
 		force_command_sub = this->create_subscription<px4_msgs::msg::VehicleThrustSetpoint>("/fmu/out/vehicle_thrust_setpoint", qos,
                 [this](const px4_msgs::msg::VehicleThrustSetpoint::UniquePtr msg) {
@@ -296,7 +307,14 @@ public:
 			
 		});
 
-		
+		desired_angular_velocity_sub = this->create_subscription<px4_msgs::msg::VehicleRatesSetpoint>("/fmu/out/vehicle_rates_setpoint", qos,
+				[this](const px4_msgs::msg::VehicleRatesSetpoint::UniquePtr msg) {
+
+				rxd_d = msg->roll;
+				ryd_d = msg->pitch;
+				rzd_d = msg->yaw;
+
+			});		
 
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ TIMER CALLBACK LOOP ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
@@ -305,6 +323,7 @@ public:
 		
 			
 		auto timer_callback = [this]()->void {
+
 
 
 			//std::cout << " Timer callback running!" << std::endl;
@@ -332,62 +351,46 @@ public:
 	                th3_cmd = asin(asine_safety(sine_theta_command(2)));
 	                th4_cmd = asin(asine_safety(sine_theta_command(3)));
 			}
+			if(th1_cmd < 0.001 && th1_cmd > -0.001){th1_cmd = 0.0;}
+			if(th2_cmd < 0.001 && th2_cmd > -0.001){th2_cmd = 0.0;}
+			if(th3_cmd < 0.001 && th3_cmd > -0.001){th3_cmd = 0.0;}
+			if(th4_cmd < 0.001 && th4_cmd > -0.001){th4_cmd = 0.0;}
 
 
-			// ----- (여기까지 th1_cmd..th4_cmd 계산 완료) -----
-
-			// === LPF init/update (once) ===
-			const float fc = 8.f; // [Hz] <- 요구사항
-			rclcpp::Time now = this->get_clock()->now();
-
-			if (!lpf_inited_) {
-				if (lpf_prev_time_.nanoseconds() != 0) {
-					const double dt = (now - lpf_prev_time_).seconds();
-					if (dt > 0.0) {
-						const float fs = static_cast<float>(1.0 / dt); // [Hz]
-						for (int i = 0; i < 4; ++i) {
-							lpf_th_[i].setButter2Lowpass(fc, fs);
-						}
-						lpf_inited_ = true;
-					}
-				}
-				lpf_prev_time_ = now; // 다음 루프에서 dt 계산
+			// th1_cmd..th4_cmd 계산 직후, 첫 루프 한정
+			static bool lpf_warmed = false;
+			if (!lpf_warmed) {
+			for (int k = 0; k < 3; ++k) { // 2~3회면 충분
+				lpf_th_[0].step(th1_cmd);
+				lpf_th_[1].step(th2_cmd);
+				lpf_th_[2].step(th3_cmd);
+				lpf_th_[3].step(th4_cmd);
 			}
+			lpf_warmed = true;
+			}			
 
-			// === Apply LPF (if initialized) ===
-			float th1_cmd_f = lpf_inited_ ? lpf_th_[0].step(th1_cmd) : th1_cmd;
-			float th2_cmd_f = lpf_inited_ ? lpf_th_[1].step(th2_cmd) : th2_cmd;
-			float th3_cmd_f = lpf_inited_ ? lpf_th_[2].step(th3_cmd) : th3_cmd;
-			float th4_cmd_f = lpf_inited_ ? lpf_th_[3].step(th4_cmd) : th4_cmd;
+			// ======= Butterworth 2차 LPF 적용 =======
+			th1_lpf_cmd = lpf_th_[0].step(th1_cmd);
+			th2_lpf_cmd = lpf_th_[1].step(th2_cmd);
+			th3_lpf_cmd = lpf_th_[2].step(th3_cmd);
+			th4_lpf_cmd = lpf_th_[3].step(th4_cmd);
 
-			// (선택) 아주 작은 데드존 유지
-			auto deadzone = [](float x){ return (x > -0.001f && x < 0.001f) ? 0.f : x; };
-			th1_cmd_f = deadzone(th1_cmd_f);
-			th2_cmd_f = deadzone(th2_cmd_f);
-			th3_cmd_f = deadzone(th3_cmd_f);
-			th4_cmd_f = deadzone(th4_cmd_f);
+			// NaN 안전처리
+			if (std::isnan(th1_lpf_cmd)) th1_lpf_cmd = 0.f;
+			if (std::isnan(th2_lpf_cmd)) th2_lpf_cmd = 0.f;
+			if (std::isnan(th3_lpf_cmd)) th3_lpf_cmd = 0.f;
+			if (std::isnan(th4_lpf_cmd)) th4_lpf_cmd = 0.f;
 
-			// (데드존 적용 뒤에 추가)
-			auto clamp = [](float v, float mn, float mx){ return v < mn ? mn : (v > mx ? mx : v); };
-
-			// sin 제한(±0.3)에 대응하는 각도 한계
-			const float kServoMaxRad = asinf(0.3f);  // ≈ 0.304693f
-
-			th1_cmd_f = clamp(th1_cmd_f, -kServoMaxRad, kServoMaxRad);
-			th2_cmd_f = clamp(th2_cmd_f, -kServoMaxRad, kServoMaxRad);
-			th3_cmd_f = clamp(th3_cmd_f, -kServoMaxRad, kServoMaxRad);
-			th4_cmd_f = clamp(th4_cmd_f, -kServoMaxRad, kServoMaxRad);
-
-			// === Publish filtered commands ===
 			std_msgs::msg::Float32MultiArray servo_angle_command;
-			servo_angle_command.data.resize(5);
-			servo_angle_command.data[0] = th1_cmd_f;
-			servo_angle_command.data[1] = th2_cmd_f;
-			servo_angle_command.data[2] = th3_cmd_f;
-			servo_angle_command.data[3] = th4_cmd_f;
+		        servo_angle_command.data.resize(5);
+        		servo_angle_command.data[0] = th1_lpf_cmd;
+		        servo_angle_command.data[1] = th2_lpf_cmd;
+		        servo_angle_command.data[2] = th3_lpf_cmd;
+		        servo_angle_command.data[3] = th4_lpf_cmd;
 			servo_angle_command.data[4] = tray_angle_command;
-			this->servo_angle_cmd_pub->publish(servo_angle_command);
 
+			// 퍼블리시
+                        this->servo_angle_cmd_pub->publish(servo_angle_command);
 
 			// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 			
@@ -490,8 +493,9 @@ public:
 				present_com_x, present_com_y, present_com_z,
 				past_com_x, past_com_y, past_com_z,
 				com_tilde_x, com_tilde_y, com_tilde_z,
-				com_update_x, com_update_y,com_update_z
-				
+				com_update_x, com_update_y,com_update_z,
+				th1_lpf_cmd, th2_lpf_cmd, th3_lpf_cmd, th4_lpf_cmd,
+				pwm1, pwm2, pwm3, pwm4
 			};
 
 			// 메시지 생성 및 초기화
@@ -509,7 +513,7 @@ public:
 
                 };
 
-                timer_ = this->create_wall_timer(12ms, timer_callback);
+                timer_ = this->create_wall_timer(10ms, timer_callback);
 
 
 
@@ -520,13 +524,15 @@ private:
 	// --- Servo command LPF (for th1..th4) ---
 	Biquad lpf_th_[4];
 	bool   lpf_inited_{false};
-	rclcpp::Time lpf_prev_time_;  // dt 계산용 (초기 0)
+	double servo_lpf_fc_hz_{6.0};  // 파라미터로 설정
+	double servo_lpf_fs_hz_{100.0};  // 샘플링 주파수 Hz (여기서 고정)
 
 	float fx = 0.0f, fy = 0.0f, fz = 0.0f, tx = 0.0f, ty = 0.0f, tz = 0.0f, tz_trim = 0.0f;
 	float tx_dhat = 0.f, ty_dhat = 0.f, tz_dhat = 0.f;
 	float f1 = 0.0f, f2 = 0.0f, f3 = 0.0f, f4 = 0.0f;
 	float pwm1 = 0.0f, pwm2 = 0.0f, pwm3 = 0.0f, pwm4 = 0.0f;
 	float th1_cmd = 0.0f, th2_cmd = 0.0f, th3_cmd = 0.0f, th4_cmd = 0.0f, th5_cmd;
+	float th1_lpf_cmd = 0.0f, th2_lpf_cmd = 0.0f, th3_lpf_cmd = 0.0f, th4_lpf_cmd = 0.0f;
 	float th1_act = 0.0f, th2_act = 0.0f, th3_act = 0.0f, th4_act = 0.0f, th5_act;
 
 	float px = 0.f, py = 0.f, pz = 0.f, qx = 0.f, qy = 0.f, qz = 0.f, qw = 0.f;
@@ -617,6 +623,7 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::CenterOfMass>::SharedPtr center_of_mass_sub;
 
 	rclcpp::Subscription<px4_msgs::msg::TorqueDhat>::SharedPtr torque_dhat_sub;
+	rclcpp::Subscription<px4_msgs::msg::VehicleRatesSetpoint>::SharedPtr desired_angular_velocity_sub;
 	
 
 };
