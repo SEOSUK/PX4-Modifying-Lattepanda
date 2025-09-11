@@ -27,6 +27,9 @@
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
 #include <px4_msgs/msg/vehicle_rates_setpoint.hpp>
+#include <px4_msgs/msg/vehicle_angular_velocity.hpp>
+#include <px4_msgs/msg/custom_dt.hpp>
+
 
 using namespace std::chrono_literals;
 
@@ -123,7 +126,7 @@ public:
 	// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 		tx = msg->xyz[0];
 		ty = msg->xyz[1];
-			tz = msg->xyz[2];
+		tz = msg->xyz[2];
 		tz_trim = msg->yaw_trim;
 		});
 
@@ -134,20 +137,6 @@ public:
 			fx = msg->xyz[0];
     			fy = msg->xyz[1];
 			fz = msg->xyz[2];
-                });
-
-		wrench_command_sub = this->create_subscription<px4_msgs::msg::WrenchCommand>("/fmu/out/wrench_command", qos,
-                [this](const px4_msgs::msg::WrenchCommand::UniquePtr msg) {
-
-                        // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
-                        /*
-			fx = msg->fx_d;
-                        fy = msg->fy_d;
-                        fz = msg->fz_d;
-
-			tx = msg->tr_d;
-			ty = msg->tp_d;
-			tz = msg->ty_d; */
                 });
 
 		thrust_command_sub = this->create_subscription<px4_msgs::msg::ThrustCommand>("/fmu/out/thrust_command", qos,
@@ -208,12 +197,7 @@ public:
 			rx = static_cast<float>(roll);//euler[2]
 			ry = static_cast<float>(pitch);//euler[1]
 			rz = static_cast<float>(yaw);//euler[0]
-
-			rxd = msg->angular_velocity[0];
-			ryd = msg->angular_velocity[1];
-			rzd = msg->angular_velocity[2];
-
-                });
+			});
 
 
 		vehicle_local_position_setpoint_sub = this->create_subscription<px4_msgs::msg::VehicleLocalPositionSetpoint>("/fmu/out/vehicle_local_position_setpoint", qos,
@@ -266,18 +250,11 @@ public:
                 [this](const px4_msgs::msg::CenterOfMass::UniquePtr msg) {
 
 			// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
-                        // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
-			present_com_x = msg->present_com_hat[0]; 
-		       	present_com_y = msg->present_com_hat[1];
-		       	present_com_z = msg->present_com_hat[2]; 
-			
-			past_com_x = msg->past_com_hat[0];
-		       	past_com_y = msg->past_com_hat[1];
-		       	past_com_z = msg->past_com_hat[2];
-			
-			com_tilde_x = msg->com_tilde[0]; 
-			com_tilde_y = msg->com_tilde[1]; 
-			com_tilde_z = msg->com_tilde[2];
+            // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
+
+			com_lpf_x = msg->com_lpf[0];
+			com_lpf_y = msg->com_lpf[1];  
+			com_lpf_z = msg->com_lpf[2];
 			
 			com_update_x = msg->com_update[0];
 			com_update_y = msg->com_update[1];  
@@ -316,6 +293,65 @@ public:
 
 			});		
 
+		angular_velocity_sub = this->create_subscription<px4_msgs::msg::VehicleAngularVelocity>(
+			"/fmu/out/vehicle_angular_velocity", qos,
+			[this](const px4_msgs::msg::VehicleAngularVelocity::UniquePtr msg)
+			{
+				// NAN 가드
+				rxd = msg->xyz[0];
+				ryd = msg->xyz[1];
+				rzd = msg->xyz[2];
+			
+				rxdd = msg->xyz_derivative[0];
+				rydd = msg->xyz_derivative[1];
+				rzdd = msg->xyz_derivative[2];
+			
+			});
+
+			dt_sub = this->create_subscription<px4_msgs::msg::CustomDt>(
+				"/fmu/out/custom_dt", qos,
+				[this](const px4_msgs::msg::CustomDt::UniquePtr msg)
+				{
+					std::string stage_name;
+					switch (msg->stage) {
+						case px4_msgs::msg::CustomDt::STAGE_POSITION:
+							stage_name = "POSITION";
+							pos_PID_dt = msg->dt;         // ← 저장
+							break;
+						case px4_msgs::msg::CustomDt::STAGE_VELOCITY:
+							stage_name = "VELOCITY";
+							vel_PID_dt = msg->dt;         // ← 저장
+							break;
+						case px4_msgs::msg::CustomDt::STAGE_ATTITUDE:
+							stage_name = "ATTITUDE";
+							att_PID_dt = msg->dt;         // ← 저장
+							break;
+						case px4_msgs::msg::CustomDt::STAGE_RATE:
+							stage_name = "RATE";
+							rate_PID_dt = msg->dt;        // ← 저장
+							break;
+						case px4_msgs::msg::CustomDt::STAGE_ALLOCATION:
+							stage_name = "ALLOCATION";
+							allo_PID_dt = msg->dt;        // ← 저장
+							break;
+						case px4_msgs::msg::CustomDt::STAGE_DOB:
+							stage_name = "DOB";
+							dob_PID_dt = msg->dt;         // ← 저장
+							break;
+						case px4_msgs::msg::CustomDt::STAGE_COM:
+							stage_name = "COM";
+							com_PID_dt = msg->dt;         // ← 저장
+							break;
+						default:
+							stage_name = "UNKNOWN";
+							break;
+					}
+
+					RCLCPP_INFO(this->get_logger(),
+								"timestamp: %lu, stage: %s (%u), dt: %.9f",
+								msg->timestamp, stage_name.c_str(), msg->stage, msg->dt);
+				});
+
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ TIMER CALLBACK LOOP ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
@@ -335,22 +371,43 @@ public:
 			// fz의 부호와 thrust_command의 부호가 같아야함 즉 양수여야함
 	
         	        float r_arm = 0.21;
-           	    	float r2 = sqrt(2);
+					constexpr float r2 = 1.41421356f;   // sqrt(2)
+					bool allocation_version_1 = true;
 
-             		SA <<  f1/r2,     f2/r2,     -(f3/r2),     -(f4/r2),
-                        	f1/r2,    -(f2/r2),   -(f3/r2),       f4/r2,
-                        	r_arm*f1,  r_arm*f2,   r_arm*f3,   r_arm*f4,
-                        	r_arm*f1, -(r_arm*f2),   r_arm*f3,  -(r_arm*f4);
-			if (SA.determinant() != 0) {
-	                invSA=SA.inverse();
+					if (allocation_version_1)
+					{
+						SA <<   f1/r2,     f2/r2,         -(f3/r2),       -(f4/r2),
+								f1/r2,     -(f2/r2),      -(f3/r2),       f4/r2,
+								r_arm*f1,  r_arm*f2,      r_arm*f3,       r_arm*f4,
+								r_arm*f1,  -(r_arm*f2),   r_arm*f3,       -(r_arm*f4);
+					}
+					else
+					{
+						float xc = std::isfinite(com_update_x) ? com_update_x : 0.f;
+						float yc = std::isfinite(com_update_y) ? com_update_y : 0.f;
 
-        	        Eigen::Vector4f sine_theta_command = invSA*wrench_servo;
+						float r_arm1 = r_arm - ( (xc - yc) / r2 );
+						float r_arm2 = r_arm + ( (xc + yc) / r2 );
+						float r_arm3 = r_arm + ( (xc - yc) / r2 );
+						float r_arm4 = r_arm - ( (xc + yc) / r2 );					
 
-                	th1_cmd = asin(asine_safety(sine_theta_command(0)));
+						SA <<   f1/r2,      f2/r2,          -(f3/r2),       -(f4/r2),
+								f1/r2,      -(f2/r2),       -(f3/r2),       f4/r2,
+								r_arm1*f1,  r_arm2*f2,      r_arm3*f3,      r_arm4*f4,
+								r_arm1*f1,  -(r_arm2*f2),   r_arm3*f3,      -(r_arm4*f4);
+					}
+
+			// if (SA.determinant() != 0) {
+	                // invSA=SA.inverse();
+
+        	        // Eigen::Vector4f sine_theta_command = invSA*wrench_servo;
+					Eigen::Vector4f sine_theta_command = SA.colPivHouseholderQr().solve(wrench_servo);
+                	
+					th1_cmd = asin(asine_safety(sine_theta_command(0)));
 	                th2_cmd = asin(asine_safety(sine_theta_command(1)));
 	                th3_cmd = asin(asine_safety(sine_theta_command(2)));
 	                th4_cmd = asin(asine_safety(sine_theta_command(3)));
-			}
+			// }
 			if(th1_cmd < 0.001 && th1_cmd > -0.001){th1_cmd = 0.0;}
 			if(th2_cmd < 0.001 && th2_cmd > -0.001){th2_cmd = 0.0;}
 			if(th3_cmd < 0.001 && th3_cmd > -0.001){th3_cmd = 0.0;}
@@ -490,12 +547,14 @@ public:
 			    	th1_cmd, th2_cmd, th3_cmd, th4_cmd, tray_angle_command,
 				ax, ay, az,
 				ax_d, ay_d, az_d,
-				present_com_x, present_com_y, present_com_z,
-				past_com_x, past_com_y, past_com_z,
-				com_tilde_x, com_tilde_y, com_tilde_z,
+				0, 0, 0,
+				com_lpf_x, com_lpf_y, com_lpf_z,
+				0, 0, 0,
 				com_update_x, com_update_y,com_update_z,
 				th1_lpf_cmd, th2_lpf_cmd, th3_lpf_cmd, th4_lpf_cmd,
-				pwm1, pwm2, pwm3, pwm4
+				pwm1, pwm2, pwm3, pwm4,
+				rxdd, rydd, rzdd,
+				pos_PID_dt, vel_PID_dt, att_PID_dt, rate_PID_dt, allo_PID_dt, dob_PID_dt, com_PID_dt
 			};
 
 			// 메시지 생성 및 초기화
@@ -537,26 +596,18 @@ private:
 
 	float px = 0.f, py = 0.f, pz = 0.f, qx = 0.f, qy = 0.f, qz = 0.f, qw = 0.f;
 	float vx = 0.f, vy = 0.f, vz = 0.f, rx = 0.f, ry = 0.f, rz = 0.f;
-	float ax = 0.f, ay = 0.f, az = 0.f, rxd = 0.f, ryd = 0.f, rzd = 0.f;
+	float ax = 0.f, ay = 0.f, az = 0.f, rxd = 0.f, ryd = 0.f, rzd = 0.f, rxdd = 0.f, rydd = 0.f, rzdd = 0.f;
 	float px_d = 0.f, py_d = 0.f, pz_d = 0.f, rx_d = 0.f, ry_d = 0.f, rz_d = 0.f;
 	float vx_d = 0.f, vy_d = 0.f, vz_d = 0.f, rxd_d = 0.f, ryd_d = 0.f, rzd_d = 0.f;
 	float ax_d = 0.f, ay_d = 0.f, az_d = 0.f; 
 
-	float present_com_x = 0.f, present_com_y = 0.f, present_com_z = 0.f;
-	float past_com_x = 0.f, past_com_y = 0.f, past_com_z = 0.f;
-	float com_tilde_x = 0.f, com_tilde_y = 0.f, com_tilde_z = 0.f;
-	float com_update_x = 0.f, com_update_y = 0.f, com_update_z = 0.f;
-
-	
-
-	
+	float com_lpf_x = 0.f, com_lpf_y = 0.f, com_lpf_z = 0.f;
+	float com_update_x = 0.f, com_update_y = 0.f, com_update_z = 0.f;	
 
 	int dob_flag = 0; int custom_mode_flag = 0; 
 	
+	float pos_PID_dt = 0.f, vel_PID_dt = 0.f, att_PID_dt = 0.f, rate_PID_dt = 0.f, allo_PID_dt = 0.f, dob_PID_dt = 0.f, com_PID_dt = 0.f;
 
-	int radian_count_ = 0;
-	int count_ = 0;
-	int direction_ = 1; // 1이면 시계 방향, -1이면 반시계 방향
 	float radian_command = 0.174533;
 	float tray_angle_command = 0.f;
 	// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ  Utility Function ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
@@ -595,7 +646,7 @@ private:
 	
 	// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 	
-        rclcpp::Publisher<px4_msgs::msg::ServoAngle>::SharedPtr servo_angle_px4_pub;
+	rclcpp::Publisher<px4_msgs::msg::ServoAngle>::SharedPtr servo_angle_px4_pub;
 	rclcpp::Publisher<px4_msgs::msg::CustomControlMode>::SharedPtr custom_control_mode_pub;
 	rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr servo_angle_cmd_pub;
 
@@ -612,7 +663,6 @@ private:
 	rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr servo_angle_ros2_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleTorqueSetpoint>::SharedPtr torque_command_sub;
 	rclcpp::Subscription<px4_msgs::msg::ThrustCommand>::SharedPtr thrust_command_sub;
-	rclcpp::Subscription<px4_msgs::msg::WrenchCommand>::SharedPtr wrench_command_sub;
 	rclcpp::Subscription<px4_msgs::msg::ActuatorMotors>::SharedPtr motor_command_sub;
  	rclcpp::Subscription<px4_msgs::msg::VehicleThrustSetpoint>::SharedPtr force_command_sub;
 
@@ -624,8 +674,8 @@ private:
 
 	rclcpp::Subscription<px4_msgs::msg::TorqueDhat>::SharedPtr torque_dhat_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleRatesSetpoint>::SharedPtr desired_angular_velocity_sub;
-	
-
+	rclcpp::Subscription<px4_msgs::msg::VehicleAngularVelocity>::SharedPtr angular_velocity_sub;
+    rclcpp::Subscription<px4_msgs::msg::CustomDt>::SharedPtr dt_sub;
 };
 
 int main(int argc, char *argv[])
