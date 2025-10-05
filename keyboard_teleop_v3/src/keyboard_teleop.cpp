@@ -18,7 +18,7 @@ public:
 
         // 초기화: [disturbance_observer, position_control, ...] → 모두 0
 	
-	flags_ = {0, 0, 0, 0, 0, 0};  // [DoB, Pos, LeftArrow, RightArrow, Circle Motion, Sine Motion]
+	flags_ = {0, 0, 0, 0, 0, 0};
 				
 
         input_thread_ = std::thread(&KeyboardPublisher::keyboard_loop, this);

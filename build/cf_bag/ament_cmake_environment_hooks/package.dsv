@@ -1,4 +1,0 @@
-source;share/cf_bag/local_setup.bash
-source;share/cf_bag/local_setup.dsv
-source;share/cf_bag/local_setup.sh
-source;share/cf_bag/local_setup.zsh

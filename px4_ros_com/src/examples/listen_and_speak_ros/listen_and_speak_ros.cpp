@@ -280,6 +280,7 @@ public:
                         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 			dob_flag = sanitize_int(msg->data[0]);
 			custom_mode_flag = sanitize_int(msg->data[1]);
+			trajectory_flag = sanitize_int(msg->data[2]);
 
 			
 		});
@@ -370,9 +371,9 @@ public:
 			// Eigen::Vector4f wrench_servo(fx, fy, 0.0, 0.0);
 			// fz의 부호와 thrust_command의 부호가 같아야함 즉 양수여야함
 	
-        	        float r_arm = 0.21;
+        	        float r_arm = 0.23;
 					constexpr float r2 = 1.41421356f;   // sqrt(2)
-					bool allocation_version_1 = true;
+					bool allocation_version_1 = false;
 
 					if (allocation_version_1)
 					{
@@ -408,10 +409,11 @@ public:
 	                th3_cmd = asin(asine_safety(sine_theta_command(2)));
 	                th4_cmd = asin(asine_safety(sine_theta_command(3)));
 			// }
-			if(th1_cmd < 0.001 && th1_cmd > -0.001){th1_cmd = 0.0;}
-			if(th2_cmd < 0.001 && th2_cmd > -0.001){th2_cmd = 0.0;}
-			if(th3_cmd < 0.001 && th3_cmd > -0.001){th3_cmd = 0.0;}
-			if(th4_cmd < 0.001 && th4_cmd > -0.001){th4_cmd = 0.0;}
+			
+			// if(th1_cmd < 0.001 && th1_cmd > -0.001){th1_cmd = 0.0;}
+			// if(th2_cmd < 0.001 && th2_cmd > -0.001){th2_cmd = 0.0;}
+			// if(th3_cmd < 0.001 && th3_cmd > -0.001){th3_cmd = 0.0;}
+			// if(th4_cmd < 0.001 && th4_cmd > -0.001){th4_cmd = 0.0;}
 
 
 			// th1_cmd..th4_cmd 계산 직후, 첫 루프 한정
@@ -521,6 +523,7 @@ public:
 
 			control_mode_msg.disturbance_observer_flag = dob_flag;
 			control_mode_msg.custom_mode_flag = custom_mode_flag;
+			control_mode_msg.trajectory_flag = trajectory_flag;
 
 			this->custom_control_mode_pub->publish(control_mode_msg);
 
@@ -604,7 +607,7 @@ private:
 	float com_lpf_x = 0.f, com_lpf_y = 0.f, com_lpf_z = 0.f;
 	float com_update_x = 0.f, com_update_y = 0.f, com_update_z = 0.f;	
 
-	int dob_flag = 0; int custom_mode_flag = 0; 
+	int dob_flag = 0; int custom_mode_flag = 0;	int trajectory_flag = 0;
 	
 	float pos_PID_dt = 0.f, vel_PID_dt = 0.f, att_PID_dt = 0.f, rate_PID_dt = 0.f, allo_PID_dt = 0.f, dob_PID_dt = 0.f, com_PID_dt = 0.f;
 
@@ -627,14 +630,14 @@ private:
 	}
 
         float asine_safety(float x) {
-		if (x > 0.3f) return 0.3f;
-                if (x < -0.3f) return -0.3f;
+		if (x > 0.7f) return 0.7f;
+                if (x < -0.7f) return -0.7f;
 		return x;
 	}
 
 	float setThrustLimitation(float thrust_command){
                         if(thrust_command < 2.0){ thrust_command = 2.0;}
-                        if(thrust_command > 55.0){ thrust_command = 55.0;}
+                        if(thrust_command > 70.0){ thrust_command = 70.0;}
                         return thrust_command;
 	}
 

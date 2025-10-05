@@ -1,6 +1,0 @@
-setup.py
-dynamixel_workbench_msgs/__init__.py
-dynamixel_workbench_msgs.egg-info/PKG-INFO
-dynamixel_workbench_msgs.egg-info/SOURCES.txt
-dynamixel_workbench_msgs.egg-info/dependency_links.txt
-dynamixel_workbench_msgs.egg-info/top_level.txt
