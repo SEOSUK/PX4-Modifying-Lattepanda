@@ -88,10 +88,10 @@ private:
   void trajectory_generation()
   {
     // ====== 조절 변수 ======
-    double frequency = 0.13;  // [Hz] 8자 주기
-    double Amplitude = 0.3;   // [m] 8자 크기(긴 축)
+    double frequency = 0.18;  // [Hz] 8자 주기
+    double Amplitude = 0.30;   // [m] 8자 크기(긴 축)
     double angle_deg = 0;  // [deg] XY 평면에서 반시계 회전 각도
-    double z_amp     = 0.2;   // [m] z 진폭
+    double z_amp     = 0.30;   // [m] z 진폭
     double yaw_fixed = 0.0;   // [rad] 고정 yaw
   
     // ====== 시간/파라미터 ======
@@ -117,7 +117,7 @@ private:
     double z = 0.0;
     if (Amplitude > 1e-9) {
       // z = (z_amp / Amplitude) * xr;   // 기준고도(offset)는 외부에서 더해질 것
-      z = 0.5 * z_amp * (std::cos(2.0 * omega * t) - 1);
+      z = 0.5 * z_amp * (std::cos(4.0 * omega * t) - 1);
     }
   
     // ====== 명령 업데이트 ======
@@ -128,56 +128,56 @@ private:
   }
   
 
-  // void trajectory_circle()
-  // {
-  //   // ====== 사용자 파라미터 ======
-  //   const double radius    = 0.2;   // [m] 원 반지름
-  //   const double period    = 2.0;  // [s] 한 바퀴 도는 시간 (주기)
-  //   const double angle_deg = 0.0;   // [deg] XY 평면에서 전체 궤적 회전(반시계)
-  //   const double z_offset  = 0.0;   // [m] 기준 고도
-  //   const double z_amp     = 0.0;   // [m] 원 그리면서 z를 살짝 출렁이게 하고 싶으면 >0
-  //   const bool   yaw_tangent = false; // true면 진행방향(접선)으로 yaw, false면 고정
-  //   const double yaw_fixed = 0.0;   // [rad] yaw_tangent=false일 때 사용할 고정 yaw
+  void trajectory_circle()
+  {
+    // ====== 사용자 파라미터 ======
+    const double radius    = 0.2;   // [m] 원 반지름
+    const double period    = 4.0;  // [s] 한 바퀴 도는 시간 (주기)
+    const double angle_deg = 0.0;   // [deg] XY 평면에서 전체 궤적 회전(반시계)
+    const double z_offset  = 0.0;   // [m] 기준 고도
+    const double z_amp     = 0.0;   // [m] 원 그리면서 z를 살짝 출렁이게 하고 싶으면 >0
+    const bool   yaw_tangent = false; // true면 진행방향(접선)으로 yaw, false면 고정
+    const double yaw_fixed = 0.0;   // [rad] yaw_tangent=false일 때 사용할 고정 yaw
 
-  //   // ====== 시간/각속도 ======
-  //   const double omega = 2.0 * M_PI / period;
-  //   const double t     = dt_sim_;
+    // ====== 시간/각속도 ======
+    const double omega = 2.0 * M_PI / period;
+    const double t     = dt_sim_;
 
-  //   // ====== 회전 전 원 궤적 ======
-  //   const double x0 = radius * (std::cos(omega * t) - 1);
-  //   const double y0 = radius * std::sin(omega * t);
+    // ====== 회전 전 원 궤적 ======
+    const double x0 = radius * (std::cos(omega * t) - 1);
+    const double y0 = radius * std::sin(omega * t);
 
-  //   // ====== XY 회전 ======
-  //   const double th = angle_deg * M_PI / 180.0;
-  //   const double ct = std::cos(th), st = std::sin(th);
-  //   const double xr = ct * x0 - st * y0;
-  //   const double yr = st * x0 + ct * y0;
+    // ====== XY 회전 ======
+    const double th = angle_deg * M_PI / 180.0;
+    const double ct = std::cos(th), st = std::sin(th);
+    const double xr = ct * x0 - st * y0;
+    const double yr = st * x0 + ct * y0;
 
-  //   // ====== Z ======
-  //   const double z = z_offset + z_amp * std::sin(omega * t);
+    // ====== Z ======
+    const double z = z_offset + z_amp * std::sin(omega * t);
 
-  //   // ====== Yaw ======
-  //   double yaw = yaw_fixed;
-  //   if (yaw_tangent) {
-  //     // 접선 방향(속도 벡터)으로 기수방위 유지
-  //     const double xdot = -radius * omega * std::sin(omega * t);
-  //     const double ydot =  radius * omega * std::cos(omega * t);
-  //     yaw = std::atan2(ydot, xdot);
-  //   }
+    // ====== Yaw ======
+    double yaw = yaw_fixed;
+    if (yaw_tangent) {
+      // 접선 방향(속도 벡터)으로 기수방위 유지
+      const double xdot = -radius * omega * std::sin(omega * t);
+      const double ydot =  radius * omega * std::cos(omega * t);
+      yaw = std::atan2(ydot, xdot);
+    }
 
-  //   // ====== 명령 적용 ======
-  //   command_position_(0) = xr;
-  //   command_position_(1) = yr;
-  //   command_position_(2) = z;
-  //   command_position_(3) = yaw;
-  // }
+    // ====== 명령 적용 ======
+    command_position_(0) = xr;
+    command_position_(1) = yr;
+    command_position_(2) = z;
+    command_position_(3) = yaw;
+  }
 
 
   void come_back()
   {
     // TODO: 원점 복귀 로직
     // 예시: 1차 수렴 (discrete-time) — 천천히 (x,y,z,yaw) -> 0 수렴
-    const double k = 1.0; // 수렴 속도
+    const double k = 0.5; // 수렴 속도
     command_position_ -= k * timer_period_ * command_position_;
   }
 
