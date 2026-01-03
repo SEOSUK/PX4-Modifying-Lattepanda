@@ -1,0 +1,9 @@
+[submodule "third_party/dynamixel-workbench-msgs"]
+	path = third_party/dynamixel-workbench-msgs
+	url = https://github.com/ROBOTIS-GIT/dynamixel-workbench-msgs
+[submodule "third_party/dynamixel-workbench"]
+	path = third_party/dynamixel-workbench
+	url = https://github.com/ROBOTIS-GIT/dynamixel-workbench
+[submodule "third_party/DynamixelSDK"]
+	path = third_party/DynamixelSDK
+	url = https://github.com/ROBOTIS-GIT/DynamixelSDK
