@@ -88,10 +88,10 @@ private:
   void trajectory_generation()
   {
     // ====== 조절 변수 ======
-    double frequency = 0.18;  // [Hz] 8자 주기
-    double Amplitude = 0.30;   // [m] 8자 크기(긴 축)
+    double frequency = 0.1;  // [Hz] 8자 주기
+    double Amplitude = 0.4;   // [m] 8자 크기(긴 축)
     double angle_deg = 0;  // [deg] XY 평면에서 반시계 회전 각도
-    double z_amp     = 0.30;   // [m] z 진폭
+    double z_amp     = 0.20;   // [m] z 진폭
     double yaw_fixed = 0.0;   // [rad] 고정 yaw
   
     // ====== 시간/파라미터 ======
@@ -104,7 +104,7 @@ private:
     const double s  = std::sin(omega * t);
     const double c  = std::cos(omega * t);
     const double x0 = Amplitude * s;
-    const double y0 = Amplitude * std::sin(2.0 * omega * t); // = A*s*c
+    const double y0 = 0.5 * Amplitude * std::sin(2.0 * omega * t); // = A*s*c
   
     // ====== XY 회전 (angle_deg만큼 반시계) ======
     const double th  = angle_deg * M_PI / 180.0;
