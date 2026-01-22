@@ -46,7 +46,7 @@ float th1_cmd = 0.0;
 float th2_cmd = 0.0;
 float th3_cmd = 0.0;
 float th4_cmd = 0.0;
-float tray_ang_cmd = 0.f;
+float payload_angle_cmd = 0.f;
 uint32_t servo1_ang = 0;
 uint32_t servo2_ang = 0;
 uint32_t servo3_ang = 0;
@@ -78,8 +78,8 @@ void SET_dynamixel()
     packetHandler->write1ByteTxRx(portHandler, 4, ADDR_OPERATING_MODE, 3, nullptr);
     packetHandler->write1ByteTxRx(portHandler, 4, ADDR_TORQUE_ENABLE, TORQUE_ENABLE, nullptr);
 
-  //  packetHandler->write1ByteTxRx(portHandler, 10, ADDR_OPERATING_MODE, 4, nullptr);
-  //  packetHandler->write1ByteTxRx(portHandler, 10, ADDR_TORQUE_ENABLE, TORQUE_ENABLE, nullptr);
+    packetHandler->write1ByteTxRx(portHandler, 5, ADDR_OPERATING_MODE, 3, nullptr);
+    packetHandler->write1ByteTxRx(portHandler, 5, ADDR_TORQUE_ENABLE, TORQUE_ENABLE, nullptr);
 
 }
 
@@ -89,21 +89,12 @@ void KILL_dynamixel()
     packetHandler->write1ByteTxRx(portHandler, 2, ADDR_TORQUE_ENABLE, TORQUE_DISABLE, nullptr);
     packetHandler->write1ByteTxRx(portHandler, 3, ADDR_TORQUE_ENABLE, TORQUE_DISABLE, nullptr);
     packetHandler->write1ByteTxRx(portHandler, 4, ADDR_TORQUE_ENABLE, TORQUE_DISABLE, nullptr);
-   // packetHandler->write1ByteTxRx(portHandler, 10, ADDR_TORQUE_ENABLE, TORQUE_DISABLE, nullptr);
+    packetHandler->write1ByteTxRx(portHandler, 5, ADDR_TORQUE_ENABLE, TORQUE_DISABLE, nullptr);
 
 
     portHandler->closePort();
 }
 
-float smooth_step_update(float prev_command, float target_command, float alpha)
-{
-    /*
-    float target_deg = 90.0f;  // 예: 사용자가 입력한 목표 각도
-    float current_deg = 0.0f;  // 현재 다이나믹셀 명령 상태
-    float alpha = 0.05f;       // 느리게 5%씩 추종
-    */			       
-    return alpha * target_command + (1.0f - alpha) * prev_command;
-}
 
 uint16_t RADIAN_TO_TICK(float goal_servo_ang){
 
@@ -128,8 +119,8 @@ void READWRITE_dynamixel()
   packetHandler->write4ByteTxRx(portHandler, 2, ADDR_GOAL_POSITION, RADIAN_TO_TICK(th2_cmd), nullptr);
   packetHandler->write4ByteTxRx(portHandler, 3, ADDR_GOAL_POSITION, RADIAN_TO_TICK(th3_cmd), nullptr);
   packetHandler->write4ByteTxRx(portHandler, 4, ADDR_GOAL_POSITION, RADIAN_TO_TICK(th4_cmd), nullptr);
-  //packetHandler->write4ByteTxRx(portHandler, 10, ADDR_GOAL_POSITION, RADIAN_TO_TICK(smooth_step_update(TICK_TO_RADIAN(servo5_ang), tray_ang_cmd, 0.5f)), nullptr);
- // packetHandler->write4ByteTxRx(portHandler, 10, ADDR_GOAL_POSITION, RADIAN_TO_TICK(tray_ang_cmd), nullptr);
+  packetHandler->write4ByteTxRx(portHandler, 5, ADDR_GOAL_POSITION, RADIAN_TO_TICK(payload_angle_cmd), nullptr);
+
   // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 
 
@@ -137,7 +128,7 @@ void READWRITE_dynamixel()
   packetHandler->read4ByteTxRx(portHandler,2,ADDR_PRESENT_POSITION,&servo2_ang,nullptr);
   packetHandler->read4ByteTxRx(portHandler,3,ADDR_PRESENT_POSITION,&servo3_ang,nullptr);
   packetHandler->read4ByteTxRx(portHandler,4,ADDR_PRESENT_POSITION,&servo4_ang,nullptr);
-//  packetHandler->read4ByteTxRx(portHandler,10,ADDR_PRESENT_POSITION,&servo5_ang,nullptr);
+  packetHandler->read4ByteTxRx(portHandler,5,ADDR_PRESENT_POSITION,&servo5_ang,nullptr);
 
   //printf(" servo1_angle | %u\n servo2_angle | %u\n servo3_angle | %u\n servo4_angle | %u\n"
   //  ,servo1_ang,servo2_ang,servo3_ang,servo4_ang);
@@ -169,7 +160,7 @@ public:
                         th2_cmd = msg->data[1];
                         th3_cmd = msg->data[2];
                         th4_cmd = msg->data[3];
-//			tray_ang_cmd = msg->data[4];
+			payload_angle_cmd = msg->data[4];
 
 
                 });
@@ -187,7 +178,7 @@ public:
                         servo_angle.data[1] = TICK_TO_RADIAN(servo2_ang);
                         servo_angle.data[2] = TICK_TO_RADIAN(servo3_ang);
                         servo_angle.data[3] = TICK_TO_RADIAN(servo4_ang);
-//			servo_angle.data[4] = TICK_TO_RADIAN(servo5_ang);
+			servo_angle.data[4] = TICK_TO_RADIAN(servo5_ang);
 
 
                         // 퍼블리시

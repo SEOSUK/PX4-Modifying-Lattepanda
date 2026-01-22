@@ -92,7 +92,7 @@ public:
 
 
 		// 초기화
-		for (int i = 0; i < 4; ++i) {
+		for (int i = 0; i < 5; ++i) {
 			lpf_th_[i].setButter2Lowpass(
 				static_cast<float>(servo_lpf_fc_hz_),
 				static_cast<float>(servo_lpf_fs_hz_));
@@ -281,6 +281,7 @@ public:
 			dob_flag = sanitize_int(msg->data[0]);
 			custom_mode_flag = sanitize_int(msg->data[1]);
 			trajectory_flag = sanitize_int(msg->data[2]);
+			payload_flag = sanitize_int(msg->data[3]);
 
 			
 		});
@@ -353,6 +354,7 @@ public:
 								msg->timestamp, stage_name.c_str(), msg->stage, msg->dt);
 				});
 
+
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ TIMER CALLBACK LOOP ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 		// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
@@ -368,8 +370,6 @@ public:
 			Eigen::Matrix4f SA;
 	                Eigen::Matrix4f invSA;
         	        Eigen::Vector4f wrench_servo(fx, fy, tz_trim, 0.0);
-			// Eigen::Vector4f wrench_servo(fx, fy, 0.0, 0.0);
-			// fz의 부호와 thrust_command의 부호가 같아야함 즉 양수여야함
 	
         	        float r_arm = 0.23;
 					constexpr float r2 = 1.41421356f;   // sqrt(2)
@@ -410,11 +410,8 @@ public:
 	                th4_cmd = asin(asine_safety(sine_theta_command(3)));
 			// }
 			
-			// if(th1_cmd < 0.001 && th1_cmd > -0.001){th1_cmd = 0.0;}
-			// if(th2_cmd < 0.001 && th2_cmd > -0.001){th2_cmd = 0.0;}
-			// if(th3_cmd < 0.001 && th3_cmd > -0.001){th3_cmd = 0.0;}
-			// if(th4_cmd < 0.001 && th4_cmd > -0.001){th4_cmd = 0.0;}
 
+			payload_angle_trajectory();
 
 			// th1_cmd..th4_cmd 계산 직후, 첫 루프 한정
 			static bool lpf_warmed = false;
@@ -424,21 +421,25 @@ public:
 				lpf_th_[1].step(th2_cmd);
 				lpf_th_[2].step(th3_cmd);
 				lpf_th_[3].step(th4_cmd);
+				lpf_th_[4].step(payload_angle_command);
+
 			}
 			lpf_warmed = true;
 			}			
-
+			
 			// ======= Butterworth 2차 LPF 적용 =======
 			th1_lpf_cmd = lpf_th_[0].step(th1_cmd);
 			th2_lpf_cmd = lpf_th_[1].step(th2_cmd);
 			th3_lpf_cmd = lpf_th_[2].step(th3_cmd);
 			th4_lpf_cmd = lpf_th_[3].step(th4_cmd);
+			payload_lpf_angle_command = lpf_th_[4].step(payload_angle_command);
 
 			// NaN 안전처리
 			if (std::isnan(th1_lpf_cmd)) th1_lpf_cmd = 0.f;
 			if (std::isnan(th2_lpf_cmd)) th2_lpf_cmd = 0.f;
 			if (std::isnan(th3_lpf_cmd)) th3_lpf_cmd = 0.f;
 			if (std::isnan(th4_lpf_cmd)) th4_lpf_cmd = 0.f;
+			if (std::isnan(payload_lpf_angle_command)) payload_lpf_angle_command = 0.f;
 
 			std_msgs::msg::Float32MultiArray servo_angle_command;
 		        servo_angle_command.data.resize(5);
@@ -446,7 +447,7 @@ public:
 		        servo_angle_command.data[1] = th2_lpf_cmd;
 		        servo_angle_command.data[2] = th3_lpf_cmd;
 		        servo_angle_command.data[3] = th4_lpf_cmd;
-			servo_angle_command.data[4] = tray_angle_command;
+				servo_angle_command.data[4] = payload_lpf_angle_command;
 
 			// 퍼블리시
                         this->servo_angle_cmd_pub->publish(servo_angle_command);
@@ -502,15 +503,17 @@ public:
                         std::string name = "servo_angle";
 
 
-			if(th1_act < 0.001 && th1_act > -0.001){th1_act = 0.0;}
+					if(th1_act < 0.001 && th1_act > -0.001){th1_act = 0.0;}
                 	if(th2_act < 0.001 && th2_act > -0.001){th2_act = 0.0;}
                	 	if(th3_act < 0.001 && th3_act > -0.001){th3_act = 0.0;}
                 	if(th4_act < 0.001 && th4_act > -0.001){th4_act = 0.0;}
+                	if(th5_act < 0.001 && th5_act > -0.001){th5_act = 0.0;}
 
 			servo_angle_msg.servo_angle[0] = th1_act;
 			servo_angle_msg.servo_angle[1] = th2_act;
 			servo_angle_msg.servo_angle[2] = th3_act;
 			servo_angle_msg.servo_angle[3] = th4_act;
+			servo_angle_msg.servo_angle[4] = th5_act;
 
                         this->servo_angle_px4_pub->publish(servo_angle_msg);
 
@@ -547,7 +550,7 @@ public:
 				tx_dhat, ty_dhat, tz_dhat,
 			    	f1, f2, f3, f4,
 			    	th1_act, th2_act, th3_act, th4_act, th5_act,
-			    	th1_cmd, th2_cmd, th3_cmd, th4_cmd, tray_angle_command,
+			    	th1_cmd, th2_cmd, th3_cmd, th4_cmd, payload_angle_command,
 				ax, ay, az,
 				ax_d, ay_d, az_d,
 				0, 0, 0,
@@ -584,7 +587,7 @@ public:
 private:
 
 	// --- Servo command LPF (for th1..th4) ---
-	Biquad lpf_th_[4];
+	Biquad lpf_th_[5];
 	bool   lpf_inited_{false};
 	double servo_lpf_fc_hz_{6.0};  // 파라미터로 설정
 	double servo_lpf_fs_hz_{100.0};  // 샘플링 주파수 Hz (여기서 고정)
@@ -607,12 +610,14 @@ private:
 	float com_lpf_x = 0.f, com_lpf_y = 0.f, com_lpf_z = 0.f;
 	float com_update_x = 0.f, com_update_y = 0.f, com_update_z = 0.f;	
 
-	int dob_flag = 0; int custom_mode_flag = 0;	int trajectory_flag = 0;
+	int dob_flag = 0; int custom_mode_flag = 0;	int trajectory_flag = 0; int payload_flag = 0;
 	
 	float pos_PID_dt = 0.f, vel_PID_dt = 0.f, att_PID_dt = 0.f, rate_PID_dt = 0.f, allo_PID_dt = 0.f, dob_PID_dt = 0.f, com_PID_dt = 0.f;
 
 	float radian_command = 0.174533;
-	float tray_angle_command = 0.f;
+	float payload_angle_command = 0.f;
+	float payload_lpf_angle_command = 0.f;
+	
 	// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ  Utility Function ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
@@ -621,9 +626,8 @@ private:
 		return std::atan2(std::sin(angle), std::cos(angle));
 	}		
 
-	inline int sanitize_int(int value) {
-		return std::isnan(value) ? 0 : value;
-	}
+	inline int sanitize_int(int value) { return value; }
+
 
 	inline float sanitize(float value) {
 		return std::isnan(value) ? 0.f : value;
@@ -639,6 +643,39 @@ private:
                         if(thrust_command < 2.0){ thrust_command = 2.0;}
                         if(thrust_command > 70.0){ thrust_command = 70.0;}
                         return thrust_command;
+	}
+
+	void payload_angle_trajectory()
+	{
+		// 고정 dt (timer 10ms라면 0.01)
+		constexpr float dt = 0.01f;
+
+		// 목표 각도 (rad)
+		constexpr float goal_position = 45.0f * (3.141592f / 180.0f); // rad
+		constexpr float goal_period   = 5.0f;                         // sec
+
+		const float T = (goal_period > 1e-6f) ? goal_period : 1e-6f;
+
+		// payload_flag==1 => goal로, payload_flag==0 => 0으로
+		const float target = (payload_flag != 0) ? goal_position : 0.0f;
+
+		// 선형 램프 속도 제한(1차 궤적): |dθ/dt| <= goal/T
+		const float max_rate = goal_position / T;   // rad/s
+		const float max_step = max_rate * dt;       // rad/step
+
+		const float err = target - payload_angle_command;
+
+		if (err > max_step) {
+			payload_angle_command += max_step;
+		} else if (err < -max_step) {
+			payload_angle_command -= max_step;
+		} else {
+			payload_angle_command = target;
+		}
+
+		// 안전 saturate
+		if (payload_angle_command > goal_position) payload_angle_command = goal_position;
+		if (payload_angle_command < 0.0f)          payload_angle_command = 0.0f;
 	}
 
 	// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //

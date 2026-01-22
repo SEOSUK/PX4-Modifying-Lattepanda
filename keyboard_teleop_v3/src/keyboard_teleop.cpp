@@ -63,7 +63,7 @@ private:
         newt.c_lflag &= ~(ICANON | ECHO);
         tcsetattr(STDIN_FILENO, TCSANOW, &newt);
     
-        std::cout << "[keyboard_teleop_node] Press 'd' for DoB, 'p' for COM, 'g' for trajectory, 'q' to quit." << std::endl;
+        std::cout << "[keyboard_teleop_node] Press 'd' for DoB, 'p' for COM, 'g' for trajectory, 't' for Payload, 'q' to quit." << std::endl;
     
         while (!stop_flag_ && rclcpp::ok()) {
             ch = getchar();
@@ -90,6 +90,11 @@ private:
                     std::cout << "[keyboard_teleop_node] Trajectory Generation = " << flags_[2] << std::endl;
                     publish_flags();
                     break;
+                case 't':
+                    flags_[3] = !flags_[3];  // toggle
+                    std::cout << "[keyboard_teleop_node] Payload Trajectory = " << flags_[3] << std::endl;
+                    publish_flags();
+                    break;                    
                 case 'q':
                     std::cout << "[keyboard_teleop_node] 'q' pressed. Exiting..." << std::endl;
                     rclcpp::shutdown();
