@@ -106,13 +106,13 @@ private:
   void trajectory_generation_with_ff()
   {
     // ====== 조절 변수 ======
-    const double fx = 0.05;   // [Hz]
-    const double fy = 0.1;   // [Hz]
-    const double fz = 0.2;   // [Hz]
+    const double fx = 0.1;   // [Hz]
+    const double fy = 0.2;   // [Hz]
+    const double fz = 0.4;   // [Hz]
 
-    const double Ax = 0.2;   // [m]
-    const double Ay = 0.1;   // [m]
-    const double Az = 0.1;   // [m]
+    const double Ax = 0.3;   // [m]
+    const double Ay = 0.15;   // [m]
+    const double Az = 0.15;   // [m]
 
     const double yaw_fixed = 0.0;   // [rad]
     const bool vel_feedforward_flag = false;
