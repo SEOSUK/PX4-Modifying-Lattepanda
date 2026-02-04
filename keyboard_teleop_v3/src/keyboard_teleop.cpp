@@ -95,6 +95,11 @@ private:
                     std::cout << "[keyboard_teleop_node] Payload Trajectory = " << flags_[3] << std::endl;
                     publish_flags();
                     break;                    
+                case 'l':
+                    flags_[4] = !flags_[4];  // toggle
+                    std::cout << "[keyboard_teleop_node] L1 Adaptive Controller = " << flags_[4] << std::endl;
+                    publish_flags();
+                    break;                    
                 case 'q':
                     std::cout << "[keyboard_teleop_node] 'q' pressed. Exiting..." << std::endl;
                     rclcpp::shutdown();

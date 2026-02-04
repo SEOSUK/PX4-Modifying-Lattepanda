@@ -23,6 +23,7 @@
 #include <px4_msgs/msg/custom_control_mode.hpp>
 #include <px4_msgs/msg/center_of_mass.hpp>
 #include <px4_msgs/msg/torque_dhat.hpp>
+#include <px4_msgs/msg/l1_adaptive_status.hpp>
 
 #include "std_msgs/msg/float32_multi_array.hpp"
 #include "std_msgs/msg/int32_multi_array.hpp"
@@ -282,8 +283,8 @@ public:
 			custom_mode_flag = sanitize_int(msg->data[1]);
 			trajectory_flag = sanitize_int(msg->data[2]);
 			payload_flag = sanitize_int(msg->data[3]);
-
-			
+			l1_adaptive_flag = sanitize_int(msg->data[4]);
+	
 		});
 
 		desired_angular_velocity_sub = this->create_subscription<px4_msgs::msg::VehicleRatesSetpoint>("/fmu/out/vehicle_rates_setpoint", qos,
@@ -309,6 +310,30 @@ public:
 				rzdd = msg->xyz_derivative[2];
 			
 			});
+
+
+		l1_status_sub =
+			this->create_subscription<px4_msgs::msg::L1AdaptiveStatus>(
+				"/fmu/out/l1_adaptive_status",
+				qos,
+				[this](const px4_msgs::msg::L1AdaptiveStatus::UniquePtr msg)
+				{
+					// disturbance estimate
+					dhat_tau_l1[0] = msg->dhat_tau[0];
+					dhat_tau_l1[1] = msg->dhat_tau[1];
+					dhat_tau_l1[2] = msg->dhat_tau[2];
+
+					// raw compensation torque
+					tau_comp_raw_l1[0] = msg->tau_comp_raw[0];
+					tau_comp_raw_l1[1] = msg->tau_comp_raw[1];
+					tau_comp_raw_l1[2] = msg->tau_comp_raw[2];
+
+					// filtered compensation torque
+					tau_comp_lpf_l1[0] = msg->tau_comp_lpf[0];
+					tau_comp_lpf_l1[1] = msg->tau_comp_lpf[1];
+					tau_comp_lpf_l1[2] = msg->tau_comp_lpf[2];
+				});
+
 
 			dt_sub = this->create_subscription<px4_msgs::msg::CustomDt>(
 				"/fmu/out/custom_dt", qos,
@@ -527,6 +552,7 @@ public:
 			control_mode_msg.disturbance_observer_flag = dob_flag;
 			control_mode_msg.custom_mode_flag = custom_mode_flag;
 			control_mode_msg.trajectory_flag = trajectory_flag;
+			control_mode_msg.l1_adaptive_flag = l1_adaptive_flag;
 
 			this->custom_control_mode_pub->publish(control_mode_msg);
 
@@ -560,7 +586,10 @@ public:
 				th1_lpf_cmd, th2_lpf_cmd, th3_lpf_cmd, th4_lpf_cmd,
 				pwm1, pwm2, pwm3, pwm4,
 				rxdd, rydd, rzdd,
-				pos_PID_dt, vel_PID_dt, att_PID_dt, rate_PID_dt, allo_PID_dt, dob_PID_dt, com_PID_dt
+				pos_PID_dt, vel_PID_dt, att_PID_dt, rate_PID_dt, allo_PID_dt, dob_PID_dt, com_PID_dt,
+				dhat_tau_l1[0], dhat_tau_l1[1], dhat_tau_l1[2],
+				tau_comp_raw_l1[0], tau_comp_raw_l1[1], tau_comp_raw_l1[2],
+				tau_comp_lpf_l1[0], tau_comp_lpf_l1[1], tau_comp_lpf_l1[2]
 			};
 
 			// 메시지 생성 및 초기화
@@ -610,7 +639,7 @@ private:
 	float com_lpf_x = 0.f, com_lpf_y = 0.f, com_lpf_z = 0.f;
 	float com_update_x = 0.f, com_update_y = 0.f, com_update_z = 0.f;	
 
-	int dob_flag = 0; int custom_mode_flag = 0;	int trajectory_flag = 0; int payload_flag = 0;
+	int dob_flag = 0; int custom_mode_flag = 0;	int trajectory_flag = 0; int payload_flag = 0; int l1_adaptive_flag = 0;
 	
 	float pos_PID_dt = 0.f, vel_PID_dt = 0.f, att_PID_dt = 0.f, rate_PID_dt = 0.f, allo_PID_dt = 0.f, dob_PID_dt = 0.f, com_PID_dt = 0.f;
 
@@ -618,6 +647,12 @@ private:
 	float payload_angle_command = 0.f;
 	float payload_lpf_angle_command = 0.f;
 	
+
+	// ===== L1 Adaptive status =====
+	float dhat_tau_l1[3]     = {0.f, 0.f, 0.f};
+	float tau_comp_raw_l1[3] = {0.f, 0.f, 0.f};
+	float tau_comp_lpf_l1[3] = {0.f, 0.f, 0.f};
+
 	// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ  Utility Function ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
@@ -716,6 +751,8 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::VehicleRatesSetpoint>::SharedPtr desired_angular_velocity_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleAngularVelocity>::SharedPtr angular_velocity_sub;
     rclcpp::Subscription<px4_msgs::msg::CustomDt>::SharedPtr dt_sub;
+	rclcpp::Subscription<px4_msgs::msg::L1AdaptiveStatus>::SharedPtr l1_status_sub;	
+
 };
 
 int main(int argc, char *argv[])
