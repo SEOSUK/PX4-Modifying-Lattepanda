@@ -686,8 +686,8 @@ private:
 		constexpr float dt = 0.01f;
 
 		// 목표 각도 (rad)
-		constexpr float goal_position = 45.0f * (3.141592f / 180.0f); // rad
-		constexpr float goal_period   = 5.0f;                         // sec
+		constexpr float goal_position = 90.0f * (3.141592f / 180.0f); // rad
+		constexpr float goal_period   = 10.0f;                         // sec
 
 		const float T = (goal_period > 1e-6f) ? goal_period : 1e-6f;
 

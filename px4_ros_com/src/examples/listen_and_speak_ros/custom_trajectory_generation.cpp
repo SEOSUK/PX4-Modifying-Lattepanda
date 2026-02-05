@@ -72,7 +72,8 @@ private:
     dt_sim_ += timer_period_;
 
     if (trajectory_toggle_) {
-      trajectory_generation_with_ff();   // ✅ position + velocity 같이 계산
+      // trajectory_generation_with_ff();   // ✅ 리사주 곡선
+      trajectory_generation_go_stop();   // ✅ 앞뒤
     } else {
       come_back();
       command_velocity_.setZero();       // ✅ OFF면 FF=0
@@ -156,6 +157,81 @@ private:
       command_velocity_(0) = vx;
       command_velocity_(1) = vy;
       command_velocity_(2) = vz;
+      command_velocity_(3) = yawrate;
+    } else {
+      command_velocity_.setZero();
+    }
+  }
+
+  void trajectory_generation_go_stop()
+  {
+    // ====== 조절 변수 ======
+    const double N = 0.5;        // [m]  이동 거리 (x방향)
+    const double n = 1.0;        // [s]  이동(또는 복귀) 시간
+    const double period = 6.0;   // [s]  각 이동 끝난 뒤 대기 시간
+
+    const double y_fixed   = 0.0;  // [m]
+    const double z_fixed   = 0.0;  // [m]
+    const double yaw_fixed = 0.0;  // [rad]
+
+    const bool vel_feedforward_flag = false;  // FF 켜기/끄기
+    const double eps = 1e-6;
+
+    // ====== 시간 처리: 반복 사이클 ======
+    // 시퀀스: (1) 0->N 이동 n초  (2) N에서 대기 period초
+    //        (3) N->0 복귀 n초  (4) 0에서 대기 period초
+    const double t = dt_sim_;
+    const double n_safe = (n > eps) ? n : eps;
+    const double T = 2.0 * n_safe + 2.0 * period;
+
+    // fmod는 음수일 수 있으니 보정
+    double tau = std::fmod(t, T);
+    if (tau < 0.0) tau += T;
+
+    // ====== 기본값 ======
+    double x  = 0.0;
+    double vx = 0.0;
+
+    // ====== 구간 경계 ======
+    const double t1 = n_safe;             // 이동 끝
+    const double t2 = n_safe + period;    // 1차 대기 끝
+    const double t3 = 2.0 * n_safe + period; // 복귀 끝
+    // const double t4 = T;               // 2차 대기 끝(사이클 끝)
+
+    // ====== piecewise 정의 ======
+    if (tau < t1) {
+      // (1) 0 -> N : 선형
+      vx = N / n_safe;
+      x  = vx * tau;
+    } else if (tau < t2) {
+      // (2) N에서 대기
+      vx = 0.0;
+      x  = N;
+    } else if (tau < t3) {
+      // (3) N -> 0 : 선형 복귀
+      const double tr = tau - t2;   // 복귀 구간 내부 시간 (0 ~ n)
+      vx = -N / n_safe;
+      x  = N + vx * tr;             // N - (N/n)*tr
+    } else {
+      // (4) 0에서 대기
+      vx = 0.0;
+      x  = 0.0;
+    }
+
+    // ====== yaw / yawrate ======
+    const double yaw = yaw_fixed;
+    const double yawrate = 0.0;
+
+    // ====== 명령 적용 ======
+    command_position_(0) = x;
+    command_position_(1) = y_fixed;
+    command_position_(2) = z_fixed;
+    command_position_(3) = yaw;
+
+    if (vel_feedforward_flag) {
+      command_velocity_(0) = vx;
+      command_velocity_(1) = 0.0;
+      command_velocity_(2) = 0.0;
       command_velocity_(3) = yawrate;
     } else {
       command_velocity_.setZero();
