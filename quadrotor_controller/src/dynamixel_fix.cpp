@@ -22,6 +22,11 @@
 #define RAD2DEG (180.0f / PI)
 
 
+#define ADDR_POSITION_D_GAIN 80
+#define ADDR_POSITION_I_GAIN 82
+#define ADDR_POSITION_P_GAIN 84
+
+
 using namespace std::chrono_literals;
 
 std::chrono::duration<float> delta_t;
@@ -55,12 +60,37 @@ uint32_t servo5_ang = 0;
 float amplitude = 0.5;
 //ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
 
+void SET_SERVO5_POSITION_PID(uint16_t p, uint16_t i, uint16_t d)
+{
+    // Torque ON 상태에서도 쓰기 되는 모델이 있지만,
+    // 안전하게 하려면 torque off -> write -> torque on 권장.
+    packetHandler->write1ByteTxRx(portHandler, 5, ADDR_TORQUE_ENABLE, TORQUE_DISABLE, nullptr);
+
+    packetHandler->write2ByteTxRx(portHandler, 5, ADDR_POSITION_D_GAIN, d, nullptr);
+    packetHandler->write2ByteTxRx(portHandler, 5, ADDR_POSITION_I_GAIN, i, nullptr);
+    packetHandler->write2ByteTxRx(portHandler, 5, ADDR_POSITION_P_GAIN, p, nullptr);
+
+    packetHandler->write1ByteTxRx(portHandler, 5, ADDR_TORQUE_ENABLE, TORQUE_ENABLE, nullptr);
+}
+
+
 void CONNECT_dynamixel()
 {
     portHandler = dynamixel::PortHandler::getPortHandler(DEVICENAME);
     portHandler->openPort();
     portHandler->setBaudRate(BAUDRATE);
 }
+
+void READ_SERVO5_POSITION_PID()
+{
+    uint16_t p=0,i=0,d=0;
+    packetHandler->read2ByteTxRx(portHandler, 5, ADDR_POSITION_P_GAIN, &p, nullptr);
+    packetHandler->read2ByteTxRx(portHandler, 5, ADDR_POSITION_I_GAIN, &i, nullptr);
+    packetHandler->read2ByteTxRx(portHandler, 5, ADDR_POSITION_D_GAIN, &d, nullptr);
+
+    std::cout << "[ID5 PID] P=" << p << " I=" << i << " D=" << d << std::endl;
+}
+
 
 void SET_dynamixel()
 {
@@ -81,6 +111,8 @@ void SET_dynamixel()
     packetHandler->write1ByteTxRx(portHandler, 5, ADDR_OPERATING_MODE, 3, nullptr);
     packetHandler->write1ByteTxRx(portHandler, 5, ADDR_TORQUE_ENABLE, TORQUE_ENABLE, nullptr);
 
+        SET_SERVO5_POSITION_PID(/*P*/ 2000, /*I*/ 200, /*D*/ 600);
+        READ_SERVO5_POSITION_PID();
 }
 
 void KILL_dynamixel()

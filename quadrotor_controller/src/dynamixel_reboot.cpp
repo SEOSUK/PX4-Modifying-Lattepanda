@@ -25,7 +25,7 @@ public:
     protocol_      = this->declare_parameter<double>("protocol", 2.0);
 
     // ROS2 파라미터의 int 배열은 int64로 들어오므로 변환 필요
-    auto ids64     = this->declare_parameter<std::vector<int64_t>>("ids", {1, 2, 3, 4});
+    auto ids64     = this->declare_parameter<std::vector<int64_t>>("ids", {1, 2, 3, 4, 5});
     ids_.assign(ids64.begin(), ids64.end());
 
     reboot_        = this->declare_parameter<bool>("reboot", true);      // true: torque off 후 reboot
