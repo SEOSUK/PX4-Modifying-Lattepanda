@@ -111,7 +111,7 @@ void SET_dynamixel()
     packetHandler->write1ByteTxRx(portHandler, 5, ADDR_OPERATING_MODE, 3, nullptr);
     packetHandler->write1ByteTxRx(portHandler, 5, ADDR_TORQUE_ENABLE, TORQUE_ENABLE, nullptr);
 
-        SET_SERVO5_POSITION_PID(/*P*/ 2000, /*I*/ 200, /*D*/ 600);
+        SET_SERVO5_POSITION_PID(/*P*/ 3000, /*I*/ 400, /*D*/ 1000);
         READ_SERVO5_POSITION_PID();
 }
 

@@ -680,110 +680,97 @@ private:
                         return thrust_command;
 	}
 
-	void payload_angle_trajectory()
-	{
-		constexpr float dt     = 0.01f;
-		constexpr float move_T = 15.0f;
-		constexpr float hold_T = 20.0f;   // ✅ 대기 15초로 변경
+void payload_angle_trajectory()
+{
+    constexpr float dt     = 0.01f;
+    constexpr float move_T = 15.0f;
+    constexpr float hold_T = 200.0f;
 
-		constexpr float deg2rad = 3.141592f / 180.0f;
-		constexpr float a0   = 0.0f   * deg2rad;
-		constexpr float a90  = 109.47f  * deg2rad;
-		constexpr float a180 = 180.0f * deg2rad;
+    constexpr float deg2rad = 3.141592f / 180.0f;
+    constexpr float a0   = 0.0f   * deg2rad;
+    constexpr float a180 = 180.0f * deg2rad;
 
-		enum Phase : int {
-			MOVE_0_TO_90 = 0,
-			HOLD_90_1,
-			MOVE_90_TO_180,
-			HOLD_180,
-			MOVE_180_TO_90,
-			HOLD_90_2,
-			MOVE_90_TO_0,
-			HOLD_0,
-			PHASE_COUNT
-		};
+    enum Phase : int {
+        MOVE_0_TO_180 = 0,
+        HOLD_180,
+        PHASE_COUNT
+    };
 
-		static int   phase = MOVE_0_TO_90;
-		static float t_in_phase = 0.0f;
+    static int   phase = MOVE_0_TO_180;
+    static float t_in_phase = 0.0f;
 
-		// ============================================================
-		// ✅ Toggle OFF: 0도로 "서서히" 복귀 (0→90을 10초에 가는 속도)
-		// ============================================================
-		if (payload_flag == 0) {
+    // ============================================================
+    // Toggle OFF: 0도로 서서히 복귀
+    // ============================================================
+    if (payload_flag == 0) {
 
-			// 시퀀스는 초기화/정지 상태로 돌려놓기
-			phase = MOVE_0_TO_90;
-			t_in_phase = 0.0f;
+        phase = MOVE_0_TO_180;
+        t_in_phase = 0.0f;
 
-			// 0→90을 10초에 가는 속도 (rad/s)
-			constexpr float return_rate = a90 / move_T;   // (90deg)/10s
-			constexpr float max_step    = return_rate * dt;
+        constexpr float return_rate = a180 / move_T;   // [rad/s]
+        constexpr float max_step    = return_rate * dt;
 
-			const float err = a0 - payload_angle_command;
+        const float err = a0 - payload_angle_command;
 
-			if (err > max_step) {
-				payload_angle_command += max_step;
-			} else if (err < -max_step) {
-				payload_angle_command -= max_step;
-			} else {
-				payload_angle_command = a0;
-			}
+        if (err > max_step)       payload_angle_command += max_step;
+        else if (err < -max_step) payload_angle_command -= max_step;
+        else                      payload_angle_command = a0;
 
-			// saturate
-			if (payload_angle_command < a0) payload_angle_command = a0;
-			if (payload_angle_command > a180) payload_angle_command = a180;
+        // clamp
+        if (payload_angle_command < a0)   payload_angle_command = a0;
+        if (payload_angle_command > a180) payload_angle_command = a180;
 
-			return;
-		}
+        return;
+    }
 
-		// ============================================================
-		// ✅ Toggle ON: 시퀀스 수행 (hold 15초)
-		// ============================================================
-		float start = a0, end = a0, duration = move_T;
+    // ============================================================
+    // Toggle ON: 0 → 180 (move_T), then hold at 180 (hold_T)
+    // ============================================================
+    float start = a0, end = a0, duration = move_T;
 
-		switch (phase) {
-		case MOVE_0_TO_90:   start = a0;   end = a90;  duration = move_T; break;
-		case HOLD_90_1:      start = a90;  end = a90;  duration = hold_T; break;
-		case MOVE_90_TO_180: start = a90;  end = a180; duration = move_T; break;
-		case HOLD_180:       start = a180; end = a180; duration = hold_T; break;
-		case MOVE_180_TO_90: start = a180; end = a90;  duration = move_T; break;
-		case HOLD_90_2:      start = a90;  end = a90;  duration = hold_T; break;
-		case MOVE_90_TO_0:   start = a90;  end = a0;   duration = move_T; break;
-		case HOLD_0:
-		default:             start = a0;   end = a0;   duration = hold_T; break;
-		}
+    switch (phase) {
+    case MOVE_0_TO_180:
+        start = a0;
+        end   = a180;
+        duration = move_T;
+        break;
 
-		t_in_phase += dt;
-		if (duration < 1e-6f) duration = 1e-6f;
+    case HOLD_180:
+    default:
+        start = a180;
+        end   = a180;
+        duration = hold_T;
+        break;
+    }
 
-		float s = t_in_phase / duration;
-		if (s > 1.0f) s = 1.0f;
+    t_in_phase += dt;
+    if (duration < 1e-6f) duration = 1e-6f;
 
-		const float target = start + (end - start) * s;
+    float s = t_in_phase / duration;
+    if (s > 1.0f) s = 1.0f;
 
-		// rate limit (phase 속도에 맞춰 추종)
-		const float max_rate = fabsf(end - start) / duration;
-		const float max_step = max_rate * dt;
+    const float target = start + (end - start) * s;
 
-		const float err = target - payload_angle_command;
+    // rate-limit (안전하게 기존 스타일 유지)
+    const float max_rate = fabsf(end - start) / duration;  // [rad/s]
+    const float max_step = max_rate * dt;
 
-		if (err > max_step)
-			payload_angle_command += max_step;
-		else if (err < -max_step)
-			payload_angle_command -= max_step;
-		else
-			payload_angle_command = target;
+    const float err = target - payload_angle_command;
 
-		// saturate
-		if (payload_angle_command > a180) payload_angle_command = a180;
-		if (payload_angle_command < a0)   payload_angle_command = a0;
+    if      (err >  max_step) payload_angle_command += max_step;
+    else if (err < -max_step) payload_angle_command -= max_step;
+    else                      payload_angle_command = target;
 
-		// phase advance
-		if (t_in_phase >= duration) {
-			t_in_phase = 0.0f;
-			phase = (phase + 1) % PHASE_COUNT;
-		}
-	}
+    // clamp
+    if (payload_angle_command < a0)   payload_angle_command = a0;
+    if (payload_angle_command > a180) payload_angle_command = a180;
+
+    // phase switch
+    if (t_in_phase >= duration) {
+        t_in_phase = 0.0f;
+        phase = (phase + 1) % PHASE_COUNT;  // MOVE -> HOLD -> MOVE -> HOLD 반복
+    }
+}
 
 
 
