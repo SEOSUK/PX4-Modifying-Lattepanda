@@ -423,18 +423,25 @@ public:
 								r_arm1*f1,  -(r_arm2*f2),   r_arm3*f3,      -(r_arm4*f4);
 					}
 
-			// if (SA.determinant() != 0) {
-	                // invSA=SA.inverse();
+				Eigen::Vector4f sine_theta_command = SA.colPivHouseholderQr().solve(wrench_servo);
+				
+			// (A) |sinθ| ≤ sin(0.7)로 먼저 포화
+			const float sin_max = servoSinMax();
+			for (int i = 0; i < 4; ++i) {
+			sine_theta_command(i) = clampf(sine_theta_command(i), -sin_max, +sin_max);
+			}
 
-        	        // Eigen::Vector4f sine_theta_command = invSA*wrench_servo;
-					Eigen::Vector4f sine_theta_command = SA.colPivHouseholderQr().solve(wrench_servo);
-                	
-					th1_cmd = asin(asine_safety(sine_theta_command(0)));
-	                th2_cmd = asin(asine_safety(sine_theta_command(1)));
-	                th3_cmd = asin(asine_safety(sine_theta_command(2)));
-	                th4_cmd = asin(asine_safety(sine_theta_command(3)));
-			// }
-			
+			// (B) asin
+			th1_cmd = std::asin(clampf(sine_theta_command(0), -1.f, +1.f));
+			th2_cmd = std::asin(clampf(sine_theta_command(1), -1.f, +1.f));
+			th3_cmd = std::asin(clampf(sine_theta_command(2), -1.f, +1.f));
+			th4_cmd = std::asin(clampf(sine_theta_command(3), -1.f, +1.f));
+
+			// (C) 최종 각도도 안전 포화 (이중 안전)
+			th1_cmd = clampf(th1_cmd, -kServoThetaMax, +kServoThetaMax);
+			th2_cmd = clampf(th2_cmd, -kServoThetaMax, +kServoThetaMax);
+			th3_cmd = clampf(th3_cmd, -kServoThetaMax, +kServoThetaMax);
+			th4_cmd = clampf(th4_cmd, -kServoThetaMax, +kServoThetaMax);
 
 			payload_angle_trajectory();
 
@@ -656,6 +663,16 @@ private:
 	// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ  Utility Function ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
         // ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
+static constexpr float kServoThetaMax = 0.7f; // Servo Saturation angle
+
+static inline float clampf(float x, float lo, float hi) {
+  return (x < lo) ? lo : (x > hi) ? hi : x;
+}
+
+static inline float servoSinMax() {
+  return std::sin(kServoThetaMax);   // float overload OK
+}
+
 
 	double wrapToPi(double angle) {
 		return std::atan2(std::sin(angle), std::cos(angle));
@@ -668,17 +685,12 @@ private:
 		return std::isnan(value) ? 0.f : value;
 	}
 
-        float asine_safety(float x) {
-		if (x > 0.7f) return 0.7f;
-                if (x < -0.7f) return -0.7f;
-		return x;
-	}
-
 	float setThrustLimitation(float thrust_command){
                         if(thrust_command < 2.0){ thrust_command = 2.0;}
-                        if(thrust_command > 70.0){ thrust_command = 70.0;}
+                        if(thrust_command > 55.0){ thrust_command = 55.0;}
                         return thrust_command;
 	}
+
 
 void payload_angle_trajectory()
 {
