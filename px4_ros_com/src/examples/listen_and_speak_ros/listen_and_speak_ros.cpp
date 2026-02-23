@@ -473,6 +473,11 @@ public:
 			if (std::isnan(th4_lpf_cmd)) th4_lpf_cmd = 0.f;
 			if (std::isnan(payload_lpf_angle_command)) payload_lpf_angle_command = 0.f;
 
+			th1_lpf_cmd = clampf(th1_lpf_cmd, -kServoThetaMax, +kServoThetaMax);
+			th2_lpf_cmd = clampf(th2_lpf_cmd, -kServoThetaMax, +kServoThetaMax);
+			th3_lpf_cmd = clampf(th3_lpf_cmd, -kServoThetaMax, +kServoThetaMax);
+			th4_lpf_cmd = clampf(th4_lpf_cmd, -kServoThetaMax, +kServoThetaMax);
+
 			std_msgs::msg::Float32MultiArray servo_angle_command;
 		        servo_angle_command.data.resize(5);
         		servo_angle_command.data[0] = th1_lpf_cmd;
@@ -625,7 +630,7 @@ private:
 	// --- Servo command LPF (for th1..th4) ---
 	Biquad lpf_th_[5];
 	bool   lpf_inited_{false};
-	double servo_lpf_fc_hz_{6.0};  // 파라미터로 설정
+	double servo_lpf_fc_hz_{8.0};  // 파라미터로 설정
 	double servo_lpf_fs_hz_{100.0};  // 샘플링 주파수 Hz (여기서 고정)
 
 	float fx = 0.0f, fy = 0.0f, fz = 0.0f, tx = 0.0f, ty = 0.0f, tz = 0.0f, tz_trim = 0.0f;
