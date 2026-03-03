@@ -697,66 +697,115 @@ static inline float servoSinMax() {
 	}
 
 
+
 void payload_angle_trajectory()
 {
     constexpr float dt     = 0.01f;
-    constexpr float move_T = 15.0f;
-    constexpr float hold_T = 200.0f;
+    constexpr float move_T = 20.0f;
+    constexpr float hold_T = 45.0f;
+
+    constexpr float boot_move_T = 10.0f;   // 부팅 시 0->180 10초
 
     constexpr float deg2rad = 3.141592f / 180.0f;
     constexpr float a0   = 0.0f   * deg2rad;
     constexpr float a180 = 180.0f * deg2rad;
 
     enum Phase : int {
-        MOVE_0_TO_180 = 0,
-        HOLD_180,
-        PHASE_COUNT
+        BOOT_MOVE_0_TO_180 = 0,
+        MOVE_180_TO_0,
+        HOLD_0,
+        MOVE_0_TO_180,
     };
 
-    static int   phase = MOVE_0_TO_180;
+    static int   phase = BOOT_MOVE_0_TO_180;
     static float t_in_phase = 0.0f;
 
+    static bool boot_done = false;   // 부팅 램프 완료 여부
+    static bool done_once = false;   // 시퀀스 1회 완료 여부
+
     // ============================================================
-    // Toggle OFF: 0도로 서서히 복귀
+    // (0) BOOT 램프: payload_flag 무관하게 딱 1번 (0->180, 10s)
     // ============================================================
-    if (payload_flag == 0) {
+    if (!boot_done) {
+        const float start = a0;
+        const float end   = a180;
+        const float duration = (boot_move_T < 1e-6f) ? 1e-6f : boot_move_T;
 
-        phase = MOVE_0_TO_180;
-        t_in_phase = 0.0f;
+        t_in_phase += dt;
+        float s = t_in_phase / duration;
+        if (s > 1.0f) s = 1.0f;
 
-        constexpr float return_rate = a180 / move_T;   // [rad/s]
-        constexpr float max_step    = return_rate * dt;
+        const float target = start + (end - start) * s;
 
-        const float err = a0 - payload_angle_command;
+        const float max_rate = fabsf(end - start) / duration;
+        const float max_step = max_rate * dt;
 
-        if (err > max_step)       payload_angle_command += max_step;
+        const float err = target - payload_angle_command;
+        if      (err >  max_step) payload_angle_command += max_step;
         else if (err < -max_step) payload_angle_command -= max_step;
-        else                      payload_angle_command = a0;
+        else                      payload_angle_command = target;
 
-        // clamp
-        if (payload_angle_command < a0)   payload_angle_command = a0;
-        if (payload_angle_command > a180) payload_angle_command = a180;
+        payload_angle_command = clampf(payload_angle_command, a0, a180);
 
+        if (t_in_phase >= duration) {
+            t_in_phase = 0.0f;
+            boot_done = true;
+            phase = MOVE_180_TO_0;   // 시퀀스 준비 상태
+            done_once = false;       // 안전하게 초기화
+            payload_angle_command = a180; // 부팅 종료 시 180에 확정
+        }
         return;
     }
 
     // ============================================================
-    // Toggle ON: 0 → 180 (move_T), then hold at 180 (hold_T)
+    // (1) payload_flag == 0: 180도로 "천천히" 복귀 (점프 금지)
+    //     - 시퀀스 상태는 리셋해서 다음 ON에서 다시 1회 수행 가능
     // ============================================================
+    if (payload_flag == 0) {
+
+        // 다음 ON 때 다시 1회 시퀀스 가능하도록 상태 리셋
+        phase = MOVE_180_TO_0;
+        t_in_phase = 0.0f;
+        done_once = false;
+
+        // ✅ 현재 각도에서 180으로 rate-limit 복귀
+        constexpr float return_T = 3.0f;  // <-- 180으로 돌아가는 시간(초). 원하는 값으로 조절
+        const float duration = (return_T < 1e-6f) ? 1e-6f : return_T;
+
+        const float target = a180;
+
+        const float max_rate = fabsf(a180 - a0) / duration;  // [rad/s]
+        const float max_step = max_rate * dt;                // [rad/step]
+
+        const float err = target - payload_angle_command;
+        if      (err >  max_step) payload_angle_command += max_step;
+        else if (err < -max_step) payload_angle_command -= max_step;
+        else                      payload_angle_command = target;
+
+        payload_angle_command = clampf(payload_angle_command, a0, a180);
+        return;
+    }
+
+    // ============================================================
+    // (2) payload_flag == 1: 1회 시퀀스 (180->0 -> hold -> 0->180)
+    // ============================================================
+    if (done_once) {
+        payload_angle_command = a180;   // 완료 후 180 고정
+        return;
+    }
+
     float start = a0, end = a0, duration = move_T;
 
     switch (phase) {
-    case MOVE_0_TO_180:
-        start = a0;
-        end   = a180;
-        duration = move_T;
+    case MOVE_180_TO_0:
+        start = a180; end = a0;   duration = move_T;
         break;
-
-    case HOLD_180:
+    case HOLD_0:
+        start = a0;   end = a0;   duration = hold_T;
+        break;
+    case MOVE_0_TO_180:
     default:
-        start = a180;
-        end   = a180;
-        duration = hold_T;
+        start = a0;   end = a180; duration = move_T;
         break;
     }
 
@@ -768,30 +817,31 @@ void payload_angle_trajectory()
 
     const float target = start + (end - start) * s;
 
-    // rate-limit (안전하게 기존 스타일 유지)
-    const float max_rate = fabsf(end - start) / duration;  // [rad/s]
+    const float max_rate = fabsf(end - start) / duration;
     const float max_step = max_rate * dt;
 
     const float err = target - payload_angle_command;
-
     if      (err >  max_step) payload_angle_command += max_step;
     else if (err < -max_step) payload_angle_command -= max_step;
     else                      payload_angle_command = target;
 
-    // clamp
-    if (payload_angle_command < a0)   payload_angle_command = a0;
-    if (payload_angle_command > a180) payload_angle_command = a180;
+    payload_angle_command = clampf(payload_angle_command, a0, a180);
 
-    // phase switch
+    // phase advance
     if (t_in_phase >= duration) {
         t_in_phase = 0.0f;
-        phase = (phase + 1) % PHASE_COUNT;  // MOVE -> HOLD -> MOVE -> HOLD 반복
+
+        if (phase == MOVE_180_TO_0)      phase = HOLD_0;
+        else if (phase == HOLD_0)        phase = MOVE_0_TO_180;
+        else {
+            done_once = true;            // 1회 완료
+            payload_angle_command = a180;
+        }
     }
 }
 
 
-
-	// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
+// ㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡㅡ //
         
 	rclcpp::TimerBase::SharedPtr timer_;
 

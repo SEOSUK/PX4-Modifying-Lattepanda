@@ -1,0 +1,204 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.5"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "dynamixel_workbench",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "bps_change::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-bps_change-Debug-ddd0480747c8a80f7cb7.json",
+					"name" : "bps_change",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "bulk_read_write::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-bulk_read_write-Debug-66f3621ca717292066ce.json",
+					"name" : "bulk_read_write",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "current_based_position::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-current_based_position-Debug-b63650ed0eefb67b83a3.json",
+					"name" : "current_based_position",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "dynamixel_workbench::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-dynamixel_workbench-Debug-ed9bc3677d992030a412.json",
+					"name" : "dynamixel_workbench",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "find_dynamixel::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-find_dynamixel-Debug-e13d45b49dc36752be0d.json",
+					"name" : "find_dynamixel",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "id_change::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-id_change-Debug-a7957bb9201265f1b107.json",
+					"name" : "id_change",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "mode_change::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-mode_change-Debug-ed9b0ab49cb46092d00a.json",
+					"name" : "mode_change",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "model_scan::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-model_scan-Debug-a09695f7d035d81db1db.json",
+					"name" : "model_scan",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "monitor::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-monitor-Debug-b052e4735750b8795025.json",
+					"name" : "monitor",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ping::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ping-Debug-cb9419ade90fad1f6c0d.json",
+					"name" : "ping",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "position::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-position-Debug-877788da255b4ee84956.json",
+					"name" : "position",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "read_write::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-read_write-Debug-09da918b8df1c0b05c64.json",
+					"name" : "read_write",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "reboot::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-reboot-Debug-5bf24ba568757d45567f.json",
+					"name" : "reboot",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "reset::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-reset-Debug-a8516120a5802da23d82.json",
+					"name" : "reset",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sync_read_write::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sync_read_write-Debug-661b7c4ef5bd0b0ab5a0.json",
+					"name" : "sync_read_write",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sync_write::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sync_write-Debug-590087b9412c887674f7.json",
+					"name" : "sync_write",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "velocity::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-velocity-Debug-3b5630b93c81f809dced.json",
+					"name" : "velocity",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/palletrone/ros2_ws/src/build",
+		"source" : "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

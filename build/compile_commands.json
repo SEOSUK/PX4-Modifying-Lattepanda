@@ -1,0 +1,102 @@
+[
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/dynamixel_workbench.dir/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_item.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_item.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_item.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/dynamixel_workbench.dir/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_driver.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_driver.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_driver.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/dynamixel_workbench.dir/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_tool.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_tool.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_tool.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/dynamixel_workbench.dir/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_workbench.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_workbench.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/src/dynamixel_workbench_toolbox/dynamixel_workbench.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/model_scan.dir/src/a_Model_Scan.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/a_Model_Scan.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/a_Model_Scan.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/ping.dir/src/b_Ping.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/b_Ping.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/b_Ping.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/id_change.dir/src/c_ID_Change.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/c_ID_Change.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/c_ID_Change.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/bps_change.dir/src/d_BPS_Change.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/d_BPS_Change.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/d_BPS_Change.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/mode_change.dir/src/e_Mode_Change.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/e_Mode_Change.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/e_Mode_Change.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/reboot.dir/src/f_Reboot.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/f_Reboot.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/f_Reboot.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/reset.dir/src/g_Reset.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/g_Reset.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/g_Reset.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/position.dir/src/h_Position.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/h_Position.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/h_Position.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/velocity.dir/src/i_Velocity.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/i_Velocity.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/i_Velocity.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/current_based_position.dir/src/j_Current_Based_Position.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/j_Current_Based_Position.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/j_Current_Based_Position.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/read_write.dir/src/k_Read_Write.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/k_Read_Write.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/k_Read_Write.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/sync_write.dir/src/l_Sync_Write.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/l_Sync_Write.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/l_Sync_Write.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/sync_read_write.dir/src/m_Sync_Read_Write.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/m_Sync_Read_Write.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/m_Sync_Read_Write.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/bulk_read_write.dir/src/n_Bulk_Read_Write.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/n_Bulk_Read_Write.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/n_Bulk_Read_Write.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/find_dynamixel.dir/src/o_Find_Dynamixel.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/o_Find_Dynamixel.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/o_Find_Dynamixel.cpp"
+},
+{
+  "directory": "/home/palletrone/ros2_ws/src/build",
+  "command": "/usr/bin/g++ -I/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/../src -g -std=c++11 -o CMakeFiles/monitor.dir/src/p_Monitor.cpp.o -c /home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/p_Monitor.cpp",
+  "file": "/home/palletrone/ros2_ws/src/dynamixel-workbench/dynamixel_workbench_toolbox/examples/src/p_Monitor.cpp"
+}
+]

@@ -1,0 +1,1 @@
+Invoking command in '/home/palletrone/ros2_ws/src/build/dynamixel_sdk': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/palletrone/ros2_ws/install/px4_offboard:/opt/ros/humble /usr/bin/cmake /home/palletrone/ros2_ws/src/DynamixelSDK/dynamixel_sdk -DCMAKE_INSTALL_PREFIX=/home/palletrone/ros2_ws/src/install/dynamixel_sdk

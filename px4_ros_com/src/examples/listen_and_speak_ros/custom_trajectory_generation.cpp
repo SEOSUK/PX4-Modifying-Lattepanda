@@ -2,11 +2,12 @@
 #include <std_msgs/msg/int32_multi_array.hpp>
 
 #include <px4_msgs/msg/custom_command_position_mode.hpp>
-#include <px4_msgs/msg/custom_command_velocity_mode.hpp>   // ✅ 추가
+#include <px4_msgs/msg/custom_command_velocity_mode.hpp>
 
 #include <Eigen/Dense>
 #include <chrono>
 #include <cmath>
+#include <algorithm>  // std::clamp
 
 class TrajectoryPublisher : public rclcpp::Node
 {
@@ -15,17 +16,28 @@ public:
   : Node("trajectory_publisher"),
     dt_sim_(0.0)
   {
-    // 하드코딩된 주기 (200Hz)
-    timer_period_ = 0.005; // [s]
+    // ===================== Tunables =====================
+    timer_period_ = 0.005; // 200 Hz
 
-    // ✅ Position publisher
+    // ✅ HARD-CODE trajectory type (choose ONE)
+    traj_type_ = TrajType::Lissajous;
+    // traj_type_ = TrajType::Circle;
+
+    // ramp durations
+    alpha_ramp_in_  = 3.0; // [s] ramp-in
+    beta_ramp_down_ = 3.0; // [s] ramp-down
+
+    yaw_fixed_ = 0.0;              // [rad]
+    vel_feedforward_flag_ = true; // set true if you want to publish vel FF
+
+    // ===================== Publishers =====================
     cmd_pos_pub_ = this->create_publisher<px4_msgs::msg::CustomCommandPositionMode>(
       "/fmu/in/custom_command_position_mode", 10);
 
-    // ✅ Velocity publisher (feedforward)
     cmd_vel_pub_ = this->create_publisher<px4_msgs::msg::CustomCommandVelocityMode>(
       "/fmu/in/custom_command_velocity_mode", 10);
 
+    // ===================== Subscriber =====================
     rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
     auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 6), qos_profile);
 
@@ -33,61 +45,96 @@ public:
       "control_mode_flags", qos,
       std::bind(&TrajectoryPublisher::onFlags, this, std::placeholders::_1));
 
-    // 상태 초기화
+    // ===================== State init =====================
     command_position_.setZero(); // [x, y, z, yaw]
-    command_velocity_.setZero(); // [vx, vy, vz, yawrate]  ✅ 추가
-    trajectory_toggle_ = false;
+    command_velocity_.setZero(); // [vx, vy, vz, yawrate]
+    trajectory_toggle_  = false;
+    ramp_down_active_   = false;
+    t_disable_          = 0.0;
 
-    // 타이머: 200hz
+    // ===================== Timer =====================
     timer_ = this->create_wall_timer(
       std::chrono::duration<double>(timer_period_),
       std::bind(&TrajectoryPublisher::onTimer, this));
-
   }
 
 private:
-  // ----- Callbacks -----
+  // ====== Trajectory type ======
+  enum class TrajType : int {
+    Lissajous = 0,
+    Circle    = 1
+  };
+
+  struct RefState {
+    double x{0}, y{0}, z{0};
+    double vx{0}, vy{0}, vz{0};
+    double yaw{0}, yawrate{0};
+  };
+
+  // ----- Flags callback -----
   void onFlags(const std_msgs::msg::Int32MultiArray::SharedPtr msg)
   {
-    const bool new_toggle = (msg->data[2] != 0); // g
+    // idx2 only (trajectory enable)
+    if (msg->data.size() < 3) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
+                           "control_mode_flags size < 3 (need at least idx2)");
+      return;
+    }
+
+    const bool new_toggle = (msg->data[2] != 0);
+
     if (new_toggle != trajectory_toggle_) {
       trajectory_toggle_ = new_toggle;
 
       if (trajectory_toggle_) {
-        // ON: 기존처럼 시간 리셋 (원하면 유지)
+        // ON: reset time (keep your previous behavior)
         dt_sim_ = 0.0;
         ramp_down_active_ = false;
       } else {
-        // OFF: ramp-down 시작
+        // OFF: start ramp-down
         ramp_down_active_ = true;
         t_disable_ = dt_sim_;
       }
 
-      RCLCPP_INFO(get_logger(), "Trajectory %s",
-                  trajectory_toggle_ ? "ENABLED" : "DISABLED");
+      RCLCPP_INFO(get_logger(), "Trajectory %s (HARD-CODED type=%s)",
+                  trajectory_toggle_ ? "ENABLED" : "DISABLED",
+                  (traj_type_ == TrajType::Circle) ? "CIRCLE" : "LISSAJOUS");
     }
   }
 
+  // ----- Main timer -----
   void onTimer()
   {
     dt_sim_ += timer_period_;
 
     if (trajectory_toggle_) {
-      trajectory_generation_with_ff();  // ON: 기존 ramp-in 포함
+      // ON: ramp-in
+      trajectory_generate(traj_type_,
+                          /*ramp_in_enable=*/true,
+                          /*alpha=*/alpha_ramp_in_,
+                          /*ramp_down=*/false,
+                          /*beta=*/0.0,
+                          /*td=*/0.0);
+
     } else if (ramp_down_active_) {
-      // OFF 직후: smooth ramp-down으로 0으로 복귀
-      const double beta = 3.0;  // ramp-down 시간 [s] (원하는 값)
+      // OFF: ramp-down
       const double td = dt_sim_ - t_disable_;
 
-      if (td >= beta) {
+      if (td >= beta_ramp_down_) {
         ramp_down_active_ = false;
         command_position_.setZero();
         command_velocity_.setZero();
       } else {
-        trajectory_generation_with_ff_ramp_down(beta, td);
+        trajectory_generate(traj_type_,
+                            /*ramp_in_enable=*/false,
+                            /*alpha=*/0.0,
+                            /*ramp_down=*/true,
+                            /*beta=*/beta_ramp_down_,
+                            /*td=*/td);
       }
+
     } else {
-      // ramp-down 끝난 뒤: 완전 0 유지
+      // fully off
       command_position_.setZero();
       command_velocity_.setZero();
     }
@@ -107,315 +154,189 @@ private:
     px4_msgs::msg::CustomCommandVelocityMode msg_vel{};
     msg_vel.timestamp = nowToUsec();
     msg_vel.setpoint = {
-      static_cast<float>(command_velocity_(0)), // vx
-      static_cast<float>(command_velocity_(1)), // vy
-      static_cast<float>(command_velocity_(2)), // vz
-      static_cast<float>(command_velocity_(3))  // yawrate
+      static_cast<float>(command_velocity_(0)),
+      static_cast<float>(command_velocity_(1)),
+      static_cast<float>(command_velocity_(2)),
+      static_cast<float>(command_velocity_(3))
     };
     cmd_vel_pub_->publish(msg_vel);
   }
 
-
-  // ✅ Gerono / Lissajous + Z + analytic velocity feedforward
-  void trajectory_generation_with_ff()
+  // ===== Quintic smoothstep helper =====
+  static inline void smoothstep_quintic(double tau, double T, double &s, double &s_dot)
   {
-    // ====== 조절 변수 ======
-    // const double fx = 0.2;   // [Hz]
-    // const double fy = 0.4;   // [Hz]
-    // const double fz = 0.4;   // [Hz]
+    if (T <= 1e-9) {
+      s = 1.0;
+      s_dot = 0.0;
+      return;
+    }
 
-    // const double Ax = 0.35;   // [m]
-    // const double Ay = 0.2;   // [m]
-    // const double Az = 0.1;   // [m]
+    const double t = std::clamp(tau / T, 0.0, 1.0);
+    const double t2 = t*t, t3 = t2*t, t4 = t3*t, t5 = t4*t;
 
-    // ====== 조절 변수 ======
-    const double fx = 0.4;   // [Hz]
-    const double fy = 0.2;   // [Hz]
-    const double fz = 0.0;   // [Hz]
+    // s = 10t^3 - 15t^4 + 6t^5
+    s = 10.0*t3 - 15.0*t4 + 6.0*t5;
 
-    const double Ax = 0.2;   // [m]
-    const double Ay = 0.4;   // [m]
-    const double Az = 0.0;   // [m]
+    // ds/dt = (30t^2 - 60t^3 + 30t^4) / T
+    s_dot = (30.0*t2 - 60.0*t3 + 30.0*t4) / T;
+  }
 
+  // ===== Reference generators =====
+  RefState make_ref_lissajous(double t) const
+  {
+    // ====== Tunables (Lissajous) ======
+    const double fx = 0.3;   // [Hz]
+    const double fy = 0.15;   // [Hz]
+    const double fz = 0.6;   // [Hz]
 
+    const double Ax = - 0.15;   // [m]
+    const double Ay = 0.35;   // [m]
+    const double Az = 0.15;   // [m]
 
+    RefState r{};
 
-    const double yaw_fixed = 0.0;   // [rad]
-    const bool vel_feedforward_flag = false;
+    const double wx = 2.0 * M_PI * fx;
+    const double wy = 2.0 * M_PI * fy;
 
-    // ✅ ramp-in 시간(초): 이 시간 동안 0→정상 궤적으로 서서히 진입
-    const double alpha = 3.0;  // [s] 원하는 값으로 튜닝
+    r.x  = Ax * std::sin(wx * t);
+    r.vx = Ax * wx * std::cos(wx * t);
 
+    r.y  = Ay * std::sin(wy * t);
+    r.vy = Ay * wy * std::cos(wy * t);
+
+    if (Az > 1e-9) {
+      const double wz = 2.0 * M_PI * fz;
+      r.z  = 0.5 * Az * (std::cos(wz * t) - 1.0);
+      r.vz = -0.5 * Az * wz * std::sin(wz * t);
+    } else {
+      r.z  = 0.0;
+      r.vz = 0.0;
+    }
+
+    r.yaw = yaw_fixed_;
+    r.yawrate = 0.0;
+    return r;
+  }
+
+  RefState make_ref_circle(double t) const
+  {
+    // ====== Tunables (Circle) ======
+    const double f  = 0.3;   // [Hz]
+    const double R  = 0.4;   // [m]
+    const double cx = 0.0;    // [m]
+    const double cy = 0.0;    // [m]
+    const double z0 = 0.0;    // [m]
+
+    RefState r{};
+    const double w = 2.0 * M_PI * f;
+
+    r.x  = cx + R * std::cos(w * t);
+    r.y  = -cy + R * std::sin(w * t);
+    r.z  = z0;
+
+    r.vx = -R * w * std::sin(w * t);
+    r.vy = -R * w * std::cos(w * t);
+    r.vz = 0.0;
+
+    r.yaw = yaw_fixed_;
+    r.yawrate = 0.0;
+    return r;
+  }
+
+  // ===== Common trajectory generator with ramp-in / ramp-down =====
+  void trajectory_generate(TrajType type,
+                           bool ramp_in_enable, double alpha,
+                           bool ramp_down, double beta, double td)
+  {
     const double t = dt_sim_;
 
-    // ============================================================
-    // ✅ Ramp-in 스케일 s(t) (quintic smoothstep: C2 연속)
-    // s(0)=0, s(alpha)=1, s_dot(0)=s_dot(alpha)=0, s_ddot(0)=s_ddot(alpha)=0
+    // 1) build reference
+    RefState ref{};
+    switch (type) {
+      case TrajType::Lissajous: ref = make_ref_lissajous(t); break;
+      case TrajType::Circle:    ref = make_ref_circle(t);   break;
+      default:                  ref = make_ref_lissajous(t); break;
+    }
+
+    // 2) ramp scale
     double s = 1.0;
     double s_dot = 0.0;
 
-    if (t < alpha) {
-      const double tau = std::max(0.0, t) / alpha;     // 0~1
-      const double tau2 = tau * tau;
-      const double tau3 = tau2 * tau;
-      const double tau4 = tau3 * tau;
-      const double tau5 = tau4 * tau;
+    if (ramp_down) {
+      // ramp-down: 1 -> 0 using s = 1 - p
+      double p = 0.0, p_dot = 0.0;
+      smoothstep_quintic(td, beta, p, p_dot);
+      s = 1.0 - p;
+      s_dot = -p_dot;
 
-      // s = 10τ^3 - 15τ^4 + 6τ^5
-      s = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5;
-
-      // ds/dt = (30τ^2 - 60τ^3 + 30τ^4) * (1/alpha)
-      s_dot = (30.0 * tau2 - 60.0 * tau3 + 30.0 * tau4) / alpha;
+    } else if (ramp_in_enable) {
+      // ramp-in: 0 -> 1
+      if (t < alpha) {
+        smoothstep_quintic(t, alpha, s, s_dot);
+      } else {
+        s = 1.0;
+        s_dot = 0.0;
+      }
     }
 
-    // ============================================================
-    // ====== X (reference) ======
-    const double wx = 2.0 * M_PI * fx;
-    const double x_ref  = Ax * std::sin(wx * t);
-    const double vx_ref = Ax * wx * std::cos(wx * t);
+    // 3) apply ramp with product rule
+    const double x  = s * ref.x;
+    const double y  = s * ref.y;
+    const double z  = s * ref.z;
 
-    // ====== Y (reference) ======
-    const double wy = 2.0 * M_PI * fy;
-    const double y_ref  = Ay * std::sin(wy * t);
-    const double vy_ref = Ay * wy * std::cos(wy * t);
+    const double vx = s * ref.vx + s_dot * ref.x;
+    const double vy = s * ref.vy + s_dot * ref.y;
+    const double vz = s * ref.vz + s_dot * ref.z;
 
-    // ====== Z (reference) ======
-    double z_ref  = 0.0;
-    double vz_ref = 0.0;
-    if (Az > 1e-9) {
-      const double wz = 2.0 * M_PI * fz;
-      z_ref  = 0.5 * Az * (std::cos(wz * t) - 1.0);
-      vz_ref = -0.5 * Az * wz * std::sin(wz * t);
-    }
-
-    // ====== yaw / yawrate ======
-    const double yaw = yaw_fixed;
-    const double yawrate = 0.0;
-
-    // ============================================================
-    // ✅ Ramp 적용 (position + velocity FF를 product rule로 일관되게)
-    const double x  = s * x_ref;
-    const double y  = s * y_ref;
-    const double z  = s * z_ref;
-
-    const double vx = s * vx_ref + s_dot * x_ref;
-    const double vy = s * vy_ref + s_dot * y_ref;
-    const double vz = s * vz_ref + s_dot * z_ref;
-
-    // ====== 명령 적용 ======
+    // 4) command output
     command_position_(0) = x;
     command_position_(1) = y;
     command_position_(2) = z;
-    command_position_(3) = yaw;
+    command_position_(3) = ref.yaw;
 
-    if (vel_feedforward_flag) {
+    if (vel_feedforward_flag_) {
       command_velocity_(0) = vx;
       command_velocity_(1) = vy;
       command_velocity_(2) = vz;
-      command_velocity_(3) = yawrate;
+      command_velocity_(3) = ref.yawrate;
     } else {
       command_velocity_.setZero();
     }
-  }
-
-
-  // ✅ OFF 시: 기존 궤적을 smoothstep으로 1->0 ramp-down
-  void trajectory_generation_with_ff_ramp_down(const double beta, const double td)
-  {
-    // ====== 조절 변수 ======
-    const double fx = 0.4;   // [Hz]
-    const double fy = 0.2;   // [Hz]
-    const double fz = 0.0;   // [Hz]
-
-    const double Ax = 0.2;   // [m]
-    const double Ay = 0.4;   // [m]
-    const double Az = 0.0;   // [m]
-
-
-
-    const double yaw_fixed = 0.0;   // [rad]
-    const bool vel_feedforward_flag = false;
-
-    const double t = dt_sim_;
-
-    // ============================================================
-    // smoothstep u in [0,1]
-    const double tau = std::clamp(td / beta, 0.0, 1.0);
-    const double tau2 = tau * tau;
-    const double tau3 = tau2 * tau;
-    const double tau4 = tau3 * tau;
-    const double tau5 = tau4 * tau;
-
-    // smoothstep: p = 10τ^3 - 15τ^4 + 6τ^5
-    const double p = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5;
-    // dp/dt = (30τ^2 - 60τ^3 + 30τ^4) * (1/beta)
-    const double p_dot = (30.0 * tau2 - 60.0 * tau3 + 30.0 * tau4) / beta;
-
-    // ramp-down scale: s = 1 - p  (1 -> 0)
-    const double s = 1.0 - p;
-    const double s_dot = -p_dot;
-
-    // ============================================================
-    // ====== X (reference) ======
-    const double wx = 2.0 * M_PI * fx;
-    const double x_ref  = Ax * std::sin(wx * t);
-    const double vx_ref = Ax * wx * std::cos(wx * t);
-
-    // ====== Y (reference) ======
-    const double wy = 2.0 * M_PI * fy;
-    const double y_ref  = Ay * std::sin(wy * t);
-    const double vy_ref = Ay * wy * std::cos(wy * t);
-
-    // ====== Z (reference) ======
-    double z_ref  = 0.0;
-    double vz_ref = 0.0;
-    if (Az > 1e-9) {
-      const double wz = 2.0 * M_PI * fz;
-      z_ref  = 0.5 * Az * (std::cos(wz * t) - 1.0);
-      vz_ref = -0.5 * Az * wz * std::sin(wz * t);
-    }
-
-    // ====== yaw / yawrate ======
-    const double yaw = yaw_fixed;
-    const double yawrate = 0.0;
-
-    // ============================================================
-    // ✅ Ramp-down 적용 (product rule)
-    const double x  = s * x_ref;
-    const double y  = s * y_ref;
-    const double z  = s * z_ref;
-
-    const double vx = s * vx_ref + s_dot * x_ref;
-    const double vy = s * vy_ref + s_dot * y_ref;
-    const double vz = s * vz_ref + s_dot * z_ref;
-
-    // ====== 명령 적용 ======
-    command_position_(0) = x;
-    command_position_(1) = y;
-    command_position_(2) = z;
-    command_position_(3) = yaw;
-
-    if (vel_feedforward_flag) {
-      command_velocity_(0) = vx;
-      command_velocity_(1) = vy;
-      command_velocity_(2) = vz;
-      command_velocity_(3) = yawrate;
-    } else {
-      command_velocity_.setZero();
-    }
-  }
-
-
-  void trajectory_generation_go_stop()
-  {
-    // ====== 조절 변수 ======
-    const double N = 0.5;        // [m]  이동 거리 (x방향)
-    const double n = 1.0;        // [s]  이동(또는 복귀) 시간
-    const double period = 6.0;   // [s]  각 이동 끝난 뒤 대기 시간
-
-    const double y_fixed   = 0.0;  // [m]
-    const double z_fixed   = 0.0;  // [m]
-    const double yaw_fixed = 0.0;  // [rad]
-
-    const bool vel_feedforward_flag = false;  // FF 켜기/끄기
-    const double eps = 1e-6;
-
-    // ====== 시간 처리: 반복 사이클 ======
-    // 시퀀스: (1) 0->N 이동 n초  (2) N에서 대기 period초
-    //        (3) N->0 복귀 n초  (4) 0에서 대기 period초
-    const double t = dt_sim_;
-    const double n_safe = (n > eps) ? n : eps;
-    const double T = 2.0 * n_safe + 2.0 * period;
-
-    // fmod는 음수일 수 있으니 보정
-    double tau = std::fmod(t, T);
-    if (tau < 0.0) tau += T;
-
-    // ====== 기본값 ======
-    double x  = 0.0;
-    double vx = 0.0;
-
-    // ====== 구간 경계 ======
-    const double t1 = n_safe;             // 이동 끝
-    const double t2 = n_safe + period;    // 1차 대기 끝
-    const double t3 = 2.0 * n_safe + period; // 복귀 끝
-    // const double t4 = T;               // 2차 대기 끝(사이클 끝)
-
-    // ====== piecewise 정의 ======
-    if (tau < t1) {
-      // (1) 0 -> N : 선형
-      vx = N / n_safe;
-      x  = vx * tau;
-    } else if (tau < t2) {
-      // (2) N에서 대기
-      vx = 0.0;
-      x  = N;
-    } else if (tau < t3) {
-      // (3) N -> 0 : 선형 복귀
-      const double tr = tau - t2;   // 복귀 구간 내부 시간 (0 ~ n)
-      vx = -N / n_safe;
-      x  = N + vx * tr;             // N - (N/n)*tr
-    } else {
-      // (4) 0에서 대기
-      vx = 0.0;
-      x  = 0.0;
-    }
-
-    // ====== yaw / yawrate ======
-    const double yaw = yaw_fixed;
-    const double yawrate = 0.0;
-
-    // ====== 명령 적용 ======
-    command_position_(0) = x;
-    command_position_(1) = y_fixed;
-    command_position_(2) = z_fixed;
-    command_position_(3) = yaw;
-
-    if (vel_feedforward_flag) {
-      command_velocity_(0) = vx;
-      command_velocity_(1) = 0.0;
-      command_velocity_(2) = 0.0;
-      command_velocity_(3) = yawrate;
-    } else {
-      command_velocity_.setZero();
-    }
-  }
-
-
-
-  void come_back()
-  {
-    // TODO: 원점 복귀 로직
-    // 예시: 1차 수렴 (discrete-time) — 천천히 (x,y,z,yaw) -> 0 수렴
-    const double k = 0.3; // 수렴 속도
-    command_position_ -= k * timer_period_ * command_position_;
   }
 
   // ----- Utils -----
   uint64_t nowToUsec() const
   {
-    rclcpp::Clock steady_clock(RCL_STEADY_TIME);  // 별도 클록
+    rclcpp::Clock steady_clock(RCL_STEADY_TIME);
     const auto now = steady_clock.now();
     return static_cast<uint64_t>(now.nanoseconds() / 1000ULL);
   }
 
   // ----- ROS Interfaces -----
   rclcpp::Publisher<px4_msgs::msg::CustomCommandPositionMode>::SharedPtr cmd_pos_pub_;
-  rclcpp::Publisher<px4_msgs::msg::CustomCommandVelocityMode>::SharedPtr cmd_vel_pub_; // ✅ 추가
+  rclcpp::Publisher<px4_msgs::msg::CustomCommandVelocityMode>::SharedPtr cmd_vel_pub_;
   rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr flags_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   // ----- State -----
-  double timer_period_;       // 고정 주기 [s] (= 0.005)
-  double dt_sim_;             // 누적 시뮬레이션 시간 [s]
-  bool trajectory_toggle_;    // g 토글 상태 (0: come_back, 1: trajectory_generation)
+  double timer_period_{0.005};
+  double dt_sim_{0.0};
+  bool trajectory_toggle_{false};
 
-  Eigen::Vector4d command_position_; // [x, y, z, yaw]
-  Eigen::Vector4d command_velocity_; // ✅ 추가
+  Eigen::Vector4d command_position_{Eigen::Vector4d::Zero()};
+  Eigen::Vector4d command_velocity_{Eigen::Vector4d::Zero()};
 
-    // ----- Ramp-down state -----
   bool   ramp_down_active_{false};
-  double t_disable_{0.0};     // ramp-down 시작 시간 (dt_sim_ 기준)
+  double t_disable_{0.0};
+
+  // ----- Tunables / Mode -----
+  TrajType traj_type_{TrajType::Lissajous};
+
+  double alpha_ramp_in_{3.0};
+  double beta_ramp_down_{3.0};
+
+  double yaw_fixed_{0.0};
+  bool   vel_feedforward_flag_{false};
 };
 
 int main(int argc, char* argv[])

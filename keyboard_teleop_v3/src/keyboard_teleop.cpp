@@ -21,12 +21,17 @@ public:
         // 초기화: [DoB, COM(p), traj(g), payload(t), L1(l), ...]
         flags_ = {0, 0, 0, 0, 0, 0};
 
-        // 15초 지연 타이머 (생성 후 즉시 cancel해서 "필요할 때만" reset으로 시작)
-        delayed_on_timer_ = this->create_wall_timer(
-            std::chrono::seconds(20),
-            std::bind(&KeyboardPublisher::delayed_turn_on_gt, this)
+        delayed_g_timer_ = this->create_wall_timer(
+            std::chrono::seconds(15),
+            std::bind(&KeyboardPublisher::delayed_turn_on_g, this)
         );
-        delayed_on_timer_->cancel();
+        delayed_g_timer_->cancel();
+
+        delayed_t_timer_ = this->create_wall_timer(
+            std::chrono::seconds(15),
+            std::bind(&KeyboardPublisher::delayed_turn_on_t, this)
+        );
+        delayed_t_timer_->cancel();
 
         input_thread_ = std::thread(&KeyboardPublisher::keyboard_loop, this);
     }
@@ -48,8 +53,9 @@ private:
     // ✅ 동시 접근 보호
     std::mutex flags_mutex_;
 
-    // ✅ p 누른 뒤 15초 후 g,t ON을 예약하는 타이머
-    rclcpp::TimerBase::SharedPtr delayed_on_timer_;
+    // ✅ p 누른 뒤 예약 타이머들
+    rclcpp::TimerBase::SharedPtr delayed_g_timer_;
+    rclcpp::TimerBase::SharedPtr delayed_t_timer_;
 
     void publish_flags_locked()
     {
@@ -66,27 +72,38 @@ private:
         std::cout << "]" << std::endl;
     }
 
-    // ✅ 15초 뒤 실행: p가 아직 ON이면 g,t ON
-    void delayed_turn_on_gt()
+    // ✅ 10초 뒤 실행: p가 아직 ON이면 g ON
+    void delayed_turn_on_g()
     {
         std::lock_guard<std::mutex> lock(flags_mutex_);
+        delayed_g_timer_->cancel(); // 1회성처럼 사용
 
-        // 타이머는 1회성처럼 쓰고 싶으니 콜백 들어오면 바로 cancel
-        delayed_on_timer_->cancel();
-
-        // p가 아직 ON일 때만 g,t ON
-        if (flags_.size() >= 4 && flags_[1] == 1) {
-            //  flags_[2] = 1;  // g ON
-            //  flags_[3] = 1;  // t ON
-            std::cout << "[keyboard_teleop_node] (delayed) g,t turned ON after 15s (p still ON)\n";
+        if (flags_.size() >= 3 && flags_[1] == 1) {
+            flags_[2] = 1;  // g ON
+            std::cout << "[keyboard_teleop_node] (delayed) g turned ON after 45s (p still ON)\n";
             publish_flags_locked();
         } else {
-            std::cout << "[keyboard_teleop_node] (delayed) skipped: p is OFF\n";
+            std::cout << "[keyboard_teleop_node] (delayed) g skipped: p is OFF\n";
+        }
+    }
+
+    // ✅ 40초 뒤 실행: p가 아직 ON이면 t ON
+    void delayed_turn_on_t()
+    {
+        std::lock_guard<std::mutex> lock(flags_mutex_);
+        delayed_t_timer_->cancel(); // 1회성처럼 사용
+
+        if (flags_.size() >= 4 && flags_[1] == 1) {
+            // flags_[3] = 1;  // t ON
+            std::cout << "[keyboard_teleop_node] (delayed) t turned ON after 15s (p still ON)\n";
+            publish_flags_locked();
+        } else {
+            std::cout << "[keyboard_teleop_node] (delayed) t skipped: p is OFF\n";
         }
     }
 
     // ✅ p 동작 정의:
-    // - OFF -> ON: p 즉시 ON + (15초 후 g,t ON 예약)
+    // - OFF -> ON: p 즉시 ON + (10초 후 g ON 예약) + (40초 후 t ON 예약)
     // - ON  -> OFF: p,g,t 즉시 OFF + 예약 취소
     void handle_p_pressed()
     {
@@ -97,10 +114,12 @@ private:
         if (!p_is_on) {
             // OFF -> ON
             flags_[1] = 1;
-            std::cout << "[keyboard_teleop_node] p ON (immediate). Scheduling g,t ON after 15s...\n";
+            std::cout << "[keyboard_teleop_node] p ON (immediate). Scheduling: g ON after 10s, t ON after 40s...\n";
 
-            // 15초 예약 시작
-            delayed_on_timer_->reset();  // now부터 다시 카운트 시작
+            // 예약 시작
+            delayed_g_timer_->reset();
+            delayed_t_timer_->reset();
+
             publish_flags_locked();
 
         } else {
@@ -108,10 +127,12 @@ private:
             flags_[1] = 0;
             flags_[2] = 0;
             flags_[3] = 0;
-            std::cout << "[keyboard_teleop_node] p pressed again -> p,g,t OFF (immediate). Cancel delayed event.\n";
+            std::cout << "[keyboard_teleop_node] p pressed again -> p,g,t OFF (immediate). Cancel delayed events.\n";
 
             // 예약 취소
-            delayed_on_timer_->cancel();
+            delayed_g_timer_->cancel();
+            delayed_t_timer_->cancel();
+
             publish_flags_locked();
         }
     }
@@ -130,7 +151,7 @@ private:
         std::cout
           << "[keyboard_teleop_node] Keys:\n"
           << "  d: toggle DoB\n"
-          << "  p: (sequence) p ON immediately, then after 15s g&t ON; press again -> p,g,t OFF immediately\n"
+          << "  p: p ON immediately; after 10s -> g ON; after 40s -> t ON; press again -> p,g,t OFF immediately\n"
           << "  g: toggle trajectory (manual)\n"
           << "  t: toggle payload (manual)\n"
           << "  l: toggle L1\n"
